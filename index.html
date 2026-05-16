@@ -218,7 +218,7 @@ async function analyzeWithClaude(base64PDF, filename) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 1000,
+      max_tokens: 4000,
       system: `Você é especialista em análise de laudos médicos.
 Extraia os resultados do PDF e retorne APENAS JSON válido, sem markdown, sem texto extra.
 Formato:
