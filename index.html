@@ -107,7 +107,6 @@ window.doLogout = async () => {
 function showApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app-screen').style.display = 'block';
-  // Update greeting and avatar with user name
   const first = currentUserName.split(' ')[0];
   const greetEl = document.getElementById('greet-name');
   if(greetEl) greetEl.textContent = `Olá, ${first} 👋`;
@@ -117,6 +116,8 @@ function showApp() {
   if(perfilName) perfilName.textContent = currentUserName;
   const perfilAvatar = document.getElementById('perfil-avatar');
   if(perfilAvatar) perfilAvatar.textContent = first.charAt(0).toUpperCase();
+  // Load featured config from Firebase
+  setTimeout(loadFeatured, 500);
 }
 
 function showLogin() {
@@ -470,17 +471,20 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
           <div class="hero-status" id="hero-status">Estável</div>
           <div class="hero-desc" id="hero-desc">Seus exames estão dentro da faixa ideal.</div>
         </div>
-        <div class="score-ring">
-          <svg width="88" height="88" viewBox="0 0 88 88">
-            <circle cx="44" cy="44" r="37" fill="none" stroke="rgba(30,41,59,.8)" stroke-width="6"/>
-            <circle id="score-circle" cx="44" cy="44" r="37" fill="none" stroke="url(#sg)" stroke-width="6" stroke-linecap="round" stroke-dasharray="232" stroke-dashoffset="41"/>
+        <div class="score-ring" style="position:relative;width:96px;height:96px;flex-shrink:0">
+          <svg width="96" height="96" viewBox="0 0 96 96" style="transform:rotate(-90deg)">
+            <circle cx="48" cy="48" r="40" fill="none" stroke="rgba(30,41,59,.8)" stroke-width="6"/>
+            <circle id="carousel-ring" cx="48" cy="48" r="40" fill="none" stroke="url(#sg)" stroke-width="6" stroke-linecap="round" stroke-dasharray="251" stroke-dashoffset="63"/>
             <defs><linearGradient id="sg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#2563EB"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs>
           </svg>
-          <div class="score-inner">
-            <div class="score-n" id="score-n">87</div>
-            <div class="score-l">Score de Saúde</div>
-            <div class="score-heart">🤍</div>
+          <div class="score-inner" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px">
+            <div id="car-name" style="font-size:9px;font-weight:500;color:rgba(255,255,255,.5);text-align:center;max-width:80px;line-height:1.2;padding:0 4px"></div>
+            <div id="car-val" style="font-size:22px;font-weight:700;color:#F8FAFC;line-height:1;letter-spacing:-1px">—</div>
+            <div id="car-unit" style="font-size:9px;font-weight:500;color:#94A3B8"></div>
+            <div id="car-badge" style="margin-top:2px"></div>
           </div>
+          <!-- dots -->
+          <div id="car-dots" style="position:absolute;bottom:-16px;left:50%;transform:translateX(-50%);display:flex;gap:4px;align-items:center"></div>
         </div>
       </div>
       <div class="hero-footer">
@@ -594,6 +598,16 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
         </div>
         <div style="font-size:15px;font-weight:600;color:#EF4444">Sair da conta</div>
       </div>
+    </div>
+    <div style="background:var(--card);border-radius:18px;padding:20px;border:1px solid rgba(255,255,255,.04);margin:12px 16px 0">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div>
+          <div style="font-size:16px;font-weight:700">Exames em destaque</div>
+          <div style="font-size:12px;color:var(--t2);margin-top:3px">Aparecem no anel da tela inicial</div>
+        </div>
+        <button onclick="saveFeatured()" style="background:linear-gradient(135deg,#2563EB,#06B6D4);border:none;color:#fff;border-radius:8px;padding:8px 16px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer">Salvar</button>
+      </div>
+      <div id="featured-list"></div>
     </div>
     <div style="background:var(--card);border-radius:18px;padding:24px;border:1px solid rgba(255,255,255,.04);text-align:center;margin:12px 16px 0">
       <div style="font-size:36px;margin-bottom:10px">🚧</div>
@@ -751,6 +765,10 @@ function render(){
   if(has){rHero();rExamRows();rInsightsHome();rTimeline();}
   rExames();rInsights();
   if(curNav==='graficos')rCharts();
+  // Restart carousel with new data
+  startCarousel();
+  // Refresh featured list if on perfil
+  if(curNav==='perfil') rFeaturedList();
 }
 
 /* HERO */
@@ -1000,10 +1018,140 @@ function sw(n){
   });
   document.getElementById('page').scrollTop=0;
   if(n==='graficos')rCharts();
+  if(n==='perfil')rFeaturedList();
 }
 
 // Auth handles initialization via onAuthStateChanged
 window.render = render;
+
+/* ── FEATURED EXAMS CAROUSEL ──────────────────────────────────────────── */
+// Default list (user can customize in Perfil)
+const DEFAULT_FEATURED = [
+  {label:'Testosterona Total', search:'testosterona total'},
+  {label:'Testosterona Livre', search:'testosterona livre'},
+  {label:'SHBG',               search:'shbg'},
+  {label:'PSA',                search:'psa'},
+  {label:'Estradiol',          search:'estradiol'},
+  {label:'Prolactina',         search:'prolactina'},
+  {label:'Vitamina D',         search:'vitamina d'},
+  {label:'Vitamina B12',       search:'vitamina b12'},
+  {label:'Glicose',            search:'glicose'},
+  {label:'Colesterol',         search:'colesterol total'},
+];
+
+let featuredList = [...DEFAULT_FEATURED];
+let carIdx = 0;
+let carTimer = null;
+let carItems = []; // filtered items that have data
+
+function loadFeatured() {
+  if(!window.fbLoad) return;
+  // Load from Firebase
+  db.ref(`users/${currentUID}/featured`).get().then(snap => {
+    if(snap.exists()) featuredList = snap.val();
+    rFeaturedList();
+    startCarousel();
+  }).catch(()=>{ rFeaturedList(); startCarousel(); });
+}
+
+window.saveFeatured = async () => {
+  try {
+    await db.ref(`users/${currentUID}/featured`).set(featuredList);
+    startCarousel();
+    // Show saved feedback
+    const btn = event.target;
+    btn.textContent = '✓ Salvo!';
+    setTimeout(()=>btn.textContent='Salvar', 1500);
+  } catch(e) { console.error(e); }
+};
+
+function rFeaturedList() {
+  const container = document.getElementById('featured-list');
+  if(!container) return;
+  // Get all unique exam names from imported exams
+  const availableExams = [...new Set(window.exams.flatMap(e=>(e.results||[]).map(r=>r.name)))].sort();
+  container.innerHTML = featuredList.map((item,i) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+      <div style="width:24px;height:24px;border-radius:6px;background:rgba(37,99,235,.2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--cyan);flex-shrink:0">${i+1}</div>
+      <select onchange="featuredList[${i}]={label:this.options[this.selectedIndex].text,search:this.value}"
+        style="flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:8px 10px;color:var(--t1);font-family:'Inter',sans-serif;font-size:13px;outline:none">
+        <option value="" ${!item.search?'selected':''}>— Nenhum —</option>
+        ${DEFAULT_FEATURED.map(d=>`<option value="${d.search}" ${item.search===d.search?'selected':''}>${d.label}</option>`).join('')}
+        ${availableExams.filter(n=>!DEFAULT_FEATURED.some(d=>n.toLowerCase().includes(d.search))).map(n=>`<option value="${n.toLowerCase()}" ${item.search===n.toLowerCase()?'selected':''}>${n}</option>`).join('')}
+      </select>
+    </div>`).join('');
+}
+
+function getLatestValue(searchTerm) {
+  if(!searchTerm) return null;
+  const sorted = [...window.exams].sort((a,b)=>new Date(b.date||0)-new Date(a.date||0));
+  for(const exam of sorted) {
+    const r = (exam.results||[]).find(r=>r.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    if(r && !isNaN(parseFloat(r.value))) return {...r, examDate: exam.date};
+  }
+  return null;
+}
+
+function startCarousel() {
+  if(carTimer) clearInterval(carTimer);
+  // Build list of featured items that have data
+  carItems = featuredList.filter(f=>f.search && getLatestValue(f.search));
+  if(!carItems.length) { showCarouselEmpty(); return; }
+  carIdx = 0;
+  showCarouselItem(carIdx);
+  carTimer = setInterval(()=>{
+    carIdx = (carIdx+1) % carItems.length;
+    showCarouselItem(carIdx);
+  }, 5000);
+}
+
+function showCarouselEmpty() {
+  const nameEl=document.getElementById('car-name');
+  const valEl=document.getElementById('car-val');
+  const unitEl=document.getElementById('car-unit');
+  const badgeEl=document.getElementById('car-badge');
+  const dotsEl=document.getElementById('car-dots');
+  if(nameEl) nameEl.textContent='Configure';
+  if(valEl) valEl.textContent='—';
+  if(unitEl) unitEl.textContent='no Perfil';
+  if(badgeEl) badgeEl.innerHTML='';
+  if(dotsEl) dotsEl.innerHTML='';
+}
+
+function showCarouselItem(idx) {
+  const item = carItems[idx];
+  if(!item) return;
+  const data = getLatestValue(item.search);
+  if(!data) return;
+
+  const nameEl=document.getElementById('car-name');
+  const valEl=document.getElementById('car-val');
+  const unitEl=document.getElementById('car-unit');
+  const badgeEl=document.getElementById('car-badge');
+  const dotsEl=document.getElementById('car-dots');
+  const ringEl=document.getElementById('carousel-ring');
+
+  if(nameEl) nameEl.textContent=item.label;
+  if(valEl) valEl.textContent=fv(data.value);
+  if(unitEl) unitEl.textContent=data.unit||'';
+
+  // Badge
+  const si=statusInfo(data.status);
+  const badgeColor=si.cls==='b-normal'?'#10B981':si.cls==='b-low'||si.cls==='b-high'?'#EF4444':si.cls==='b-attention'?'#F59E0B':'#64748B';
+  const badgeBg=si.cls==='b-normal'?'rgba(16,185,129,.2)':si.cls==='b-low'||si.cls==='b-high'?'rgba(239,68,68,.2)':si.cls==='b-attention'?'rgba(245,158,11,.2)':'rgba(100,116,139,.2)';
+  if(badgeEl&&si.label) badgeEl.innerHTML=`<span style="background:${badgeBg};color:${badgeColor};border-radius:8px;padding:2px 7px;font-size:9px;font-weight:600">${si.label}</span>`;
+
+  // Ring progress based on ref
+  if(ringEl && data.refMin!=null && data.refMax!=null) {
+    const pct=Math.min(Math.max((data.value-data.refMin)/(data.refMax-data.refMin),0),1);
+    ringEl.setAttribute('stroke-dashoffset', Math.round((1-pct)*251));
+  }
+
+  // Dots
+  if(dotsEl) {
+    dotsEl.innerHTML=carItems.map((_,i)=>`<div style="width:${i===idx?'16px':'6px'};height:6px;border-radius:3px;background:${i===idx?'linear-gradient(90deg,#2563EB,#06B6D4)':'rgba(255,255,255,.2)'};transition:all .3s"></div>`).join('');
+  }
+}
 </script>
 </body>
 </html>
