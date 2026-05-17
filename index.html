@@ -233,9 +233,41 @@ function openAgenda(){
   document.getElementById('agenda-modal').classList.add('open');
   loadAgendaData();
 }
-function closeAgenda(){document.getElementById('agenda-modal').classList.remove('open');}
+function closeAgenda(){
+  const medOpen=document.getElementById('med-form').classList.contains('open');
+  const cycleOpen=document.getElementById('cycle-form').classList.contains('open');
+  if(medOpen&&formHasData(['mf-name','mf-dose','mf-brand','mf-qty-num'])){
+    chConfirm('Medicamento não salvo','Você começou a cadastrar um medicamento. Deseja descartar e fechar?',()=>{
+      closeMedForm();document.getElementById('agenda-modal').classList.remove('open');
+    });return;
+  }
+  if(cycleOpen&&formHasData(['cf-name','cf-interval','cf-lastdate'])){
+    chConfirm('Aplicação não salva','Você começou a cadastrar uma aplicação. Deseja descartar e fechar?',()=>{
+      closeCycleForm();document.getElementById('agenda-modal').classList.remove('open');
+    });return;
+  }
+  document.getElementById('agenda-modal').classList.remove('open');
+}
+
+function formHasData(fields){return fields.some(id=>{const el=document.getElementById(id);return el&&el.value.trim();});}
 
 function agTab(tab){
+  const medOpen=document.getElementById('med-form').classList.contains('open');
+  const cycleOpen=document.getElementById('cycle-form').classList.contains('open');
+  if(medOpen&&formHasData(['mf-name','mf-dose','mf-brand','mf-qty-num'])){
+    chConfirm('Medicamento não salvo','Você começou a cadastrar um medicamento. Deseja descartar e continuar?',()=>{
+      closeMedForm();doAgTab(tab);
+    });return;
+  }
+  if(cycleOpen&&formHasData(['cf-name','cf-interval','cf-lastdate'])){
+    chConfirm('Aplicação não salva','Você começou a cadastrar uma aplicação. Deseja descartar e continuar?',()=>{
+      closeCycleForm();doAgTab(tab);
+    });return;
+  }
+  doAgTab(tab);
+}
+
+function doAgTab(tab){
   document.querySelectorAll('.ag-tab').forEach((t,i)=>t.classList.toggle('active',['meds','cycles','notifs'][i]===tab));
   document.querySelectorAll('.ag-section').forEach(s=>s.classList.remove('active'));
   document.getElementById('ag-'+tab).classList.add('active');
