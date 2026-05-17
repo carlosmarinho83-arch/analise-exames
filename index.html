@@ -224,6 +224,247 @@ function buildCol(id,items,selected,onChange){
   };
 }
 
+/* ── AGENDA ── */
+let agendaMeds = [];
+let agendaCycles = [];
+let agendaNotifs = {};
+
+function openAgenda(){
+  document.getElementById('agenda-modal').classList.add('open');
+  loadAgendaData();
+}
+function closeAgenda(){document.getElementById('agenda-modal').classList.remove('open');}
+
+function agTab(tab){
+  document.querySelectorAll('.ag-tab').forEach((t,i)=>t.classList.toggle('active',['meds','cycles','notifs'][i]===tab));
+  document.querySelectorAll('.ag-section').forEach(s=>s.classList.remove('active'));
+  document.getElementById('ag-'+tab).classList.add('active');
+}
+
+async function loadAgendaData(){
+  if(!currentUID)return;
+  try{
+    const [medsSnap,cyclesSnap,notifsSnap]=await Promise.all([
+      db.ref(`users/${currentUID}/agenda/meds`).get(),
+      db.ref(`users/${currentUID}/agenda/cycles`).get(),
+      db.ref(`users/${currentUID}/agenda/notifs`).get()
+    ]);
+    agendaMeds=medsSnap.exists()?Object.values(medsSnap.val()):[];
+    agendaCycles=cyclesSnap.exists()?Object.values(cyclesSnap.val()):[];
+    agendaNotifs=notifsSnap.exists()?notifsSnap.val():{};
+    renderMeds();renderCycles();renderNotifs();
+  }catch(e){console.error(e);}
+}
+
+/* ── MEDICAMENTOS ── */
+function openMedForm(){
+  document.getElementById('med-form').classList.add('open');
+  document.getElementById('med-add-btn').style.display='none';
+  document.getElementById('mf-name').value='';
+  document.getElementById('mf-dose').value='';
+  document.getElementById('mf-qty').value='';
+  document.getElementById('mf-freq').value='diario';
+  document.getElementById('mf-time').value='Café da manhã';
+  document.querySelectorAll('#med-form .ag-day').forEach(d=>d.classList.remove('sel'));
+  toggleMedDays();
+}
+function closeMedForm(){
+  document.getElementById('med-form').classList.remove('open');
+  document.getElementById('med-add-btn').style.display='flex';
+}
+function toggleMedDays(){
+  const freq=document.getElementById('mf-freq').value;
+  document.getElementById('mf-days-wrap').style.display=freq==='semanal'?'block':'none';
+}
+function toggleDay(el){el.classList.toggle('sel');}
+function toggleCycleType(){
+  const t=document.getElementById('cf-type').value;
+  document.getElementById('cf-interval-wrap').style.display=t==='interval'?'block':'none';
+  document.getElementById('cf-weekdays-wrap').style.display=t==='weekdays'?'block':'none';
+}
+
+async function saveMed(){
+  const name=document.getElementById('mf-name').value.trim();
+  const dose=document.getElementById('mf-dose').value.trim();
+  if(!name){chAlert('error','Campo obrigatório','Informe o nome do medicamento.');return;}
+  const freq=document.getElementById('mf-freq').value;
+  const days=freq==='semanal'?[...document.querySelectorAll('#med-form .ag-day.sel')].map(d=>Number(d.dataset.d)):[];
+  if(freq==='semanal'&&!days.length){chAlert('error','Selecione os dias','Escolha ao menos um dia da semana.');return;}
+  const med={id:Date.now()+'_med',name,dose,freq,days,time:document.getElementById('mf-time').value,qty:document.getElementById('mf-qty').value};
+  agendaMeds.push(med);
+  await db.ref(`users/${currentUID}/agenda/meds/${med.id}`).set(med);
+  closeMedForm();renderMeds();renderNotifs();
+  chAlert('success','Medicamento salvo!','Adicionado à sua agenda.');
+}
+
+async function deleteMed(id){
+  agendaMeds=agendaMeds.filter(m=>m.id!==id);
+  await db.ref(`users/${currentUID}/agenda/meds/${id}`).remove();
+  renderMeds();renderNotifs();
+}
+
+const DAYS_PT=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+function renderMeds(){
+  const el=document.getElementById('meds-list');
+  if(!agendaMeds.length){el.innerHTML='<div class="ag-empty">Nenhum medicamento cadastrado.</div>';return;}
+  el.innerHTML=agendaMeds.map(m=>{
+    const freqTxt=m.freq==='diario'?'Todos os dias':m.days.map(d=>DAYS_PT[d]).join(', ');
+    return`<div class="ag-item">
+      <div class="ag-item-top">
+        <div><div class="ag-item-name">${m.name}</div><div class="ag-item-dose">${m.dose||''}</div></div>
+        <div class="ag-item-del" onclick="confirmDeleteMed('${m.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></div>
+      </div>
+      <div class="ag-item-rows">
+        <div class="ag-item-row"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>${freqTxt}</div>
+        <div class="ag-item-row"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${m.time}${m.qty?' · '+m.qty:''}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function confirmDeleteMed(id){chConfirm('Remover medicamento?','Este item será removido da sua agenda.',()=>deleteMed(id));}
+
+/* ── CICLOS ── */
+function openCycleForm(){
+  document.getElementById('cycle-form').classList.add('open');
+  document.getElementById('cycle-add-btn').style.display='none';
+  document.getElementById('cf-name').value='';
+  document.getElementById('cf-interval').value='';
+  document.getElementById('cf-lastdate').value='';
+  document.getElementById('cf-type').value='interval';
+  document.getElementById('cf-peakvalley').checked=true;
+  document.querySelectorAll('#cf-days .ag-day').forEach(d=>d.classList.remove('sel'));
+  toggleCycleType();
+}
+function closeCycleForm(){
+  document.getElementById('cycle-form').classList.remove('open');
+  document.getElementById('cycle-add-btn').style.display='flex';
+}
+
+async function saveCycle(){
+  const name=document.getElementById('cf-name').value.trim();
+  if(!name){chAlert('error','Campo obrigatório','Informe o nome da aplicação.');return;}
+  const type=document.getElementById('cf-type').value;
+  const interval=parseInt(document.getElementById('cf-interval').value)||0;
+  const days=[...document.querySelectorAll('#cf-days .ag-day.sel')].map(d=>Number(d.dataset.d));
+  if(type==='interval'&&interval<1){chAlert('error','Intervalo inválido','Informe o número de dias entre aplicações.');return;}
+  if(type==='weekdays'&&!days.length){chAlert('error','Selecione os dias','Escolha ao menos um dia da semana.');return;}
+  const lastdate=document.getElementById('cf-lastdate').value;
+  if(!lastdate){chAlert('error','Data obrigatória','Informe a data da última aplicação.');return;}
+  const cycle={id:Date.now()+'_cyc',name,type,interval,days,lastdate,peakvalley:document.getElementById('cf-peakvalley').checked};
+  agendaCycles.push(cycle);
+  await db.ref(`users/${currentUID}/agenda/cycles/${cycle.id}`).set(cycle);
+  closeCycleForm();renderCycles();renderNotifs();
+  chAlert('success','Aplicação salva!','Ciclo adicionado à sua agenda.');
+}
+
+async function deleteCycle(id){
+  agendaCycles=agendaCycles.filter(c=>c.id!==id);
+  await db.ref(`users/${currentUID}/agenda/cycles/${id}`).remove();
+  renderCycles();renderNotifs();
+}
+
+function confirmDeleteCycle(id){chConfirm('Remover aplicação?','Este ciclo será removido da sua agenda.',()=>deleteCycle(id));}
+
+function calcNextDates(cycle,count=4){
+  const today=new Date();today.setHours(0,0,0,0);
+  const dates=[];
+  if(cycle.type==='interval'){
+    let base=new Date(cycle.lastdate+'T12:00:00');
+    while(dates.length<count){
+      base=new Date(base.getTime()+cycle.interval*86400000);
+      dates.push(new Date(base));
+    }
+  } else {
+    // weekdays
+    let d=new Date(today);
+    let tries=0;
+    while(dates.length<count&&tries<365){
+      d=new Date(d.getTime()+86400000);tries++;
+      if(cycle.days.includes(d.getDay()))dates.push(new Date(d));
+    }
+  }
+  return dates;
+}
+
+function fmtDate(d){return d.toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'});}
+function daysFromToday(d){const today=new Date();today.setHours(0,0,0,0);return Math.round((d-today)/86400000);}
+
+function renderCycles(){
+  const el=document.getElementById('cycles-list');
+  if(!agendaCycles.length){el.innerHTML='<div class="ag-empty">Nenhuma aplicação cadastrada.</div>';return;}
+  el.innerHTML=agendaCycles.map(c=>{
+    const nexts=calcNextDates(c,4);
+    const nextRows=nexts.map((d,i)=>{
+      const diff=daysFromToday(d);
+      const label=diff===0?'Hoje':diff===1?'Amanhã':`Em ${diff} dias`;
+      const pico=c.peakvalley?new Date(d.getTime()+2*86400000):null;
+      const vale=c.peakvalley&&c.type==='interval'?new Date(d.getTime()+(c.interval-1)*86400000):null;
+      return`<div class="cycle-row">
+        <span class="cycle-label">${fmtDate(d)}</span>
+        <span class="cycle-val">${label}</span>
+        <span class="cycle-badge cycle-dose">Aplicação</span>
+      </div>
+      ${pico&&i===0?`<div class="cycle-row"><span class="cycle-label">${fmtDate(pico)} (+48h)</span><span class="cycle-val">Pico</span><span class="cycle-badge cycle-pico">Pico</span></div>`:''}
+      ${vale&&i===0?`<div class="cycle-row"><span class="cycle-label">${fmtDate(vale)}</span><span class="cycle-val">Vale / Próx.</span><span class="cycle-badge cycle-vale">Vale</span></div>`:''}`;
+    }).join('');
+    const freqTxt=c.type==='interval'?`A cada ${c.interval} dias`:c.days.map(d=>DAYS_PT[d]).join(', ');
+    return`<div class="ag-item">
+      <div class="ag-item-top">
+        <div><div class="ag-item-name">${c.name}</div><div class="ag-item-dose">${freqTxt}</div></div>
+        <div class="ag-item-del" onclick="confirmDeleteCycle('${c.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></div>
+      </div>
+      <div class="cycle-next">${nextRows}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ── NOTIFICAÇÕES ── */
+function renderNotifs(){
+  const el=document.getElementById('notifs-list');
+  const all=[
+    ...agendaMeds.map(m=>({id:m.id,label:m.name,sub:m.time,type:'med'})),
+    ...agendaCycles.map(c=>({id:c.id,label:c.name,sub:c.type==='interval'?`A cada ${c.interval} dias`:c.days.map(d=>DAYS_PT[d]).join(', '),type:'cycle'}))
+  ];
+  if(!all.length){el.innerHTML='<div class="ag-empty">Adicione medicamentos ou aplicações para configurar notificações.</div>';return;}
+  el.innerHTML=all.map(item=>`
+    <div class="ag-notif-row">
+      <div>
+        <div style="font-size:13px;font-weight:600">${item.label}</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:2px">${item.sub}</div>
+      </div>
+      <label class="ag-toggle">
+        <input type="checkbox" ${agendaNotifs[item.id]?'checked':''} onchange="toggleNotif('${item.id}',this.checked)">
+        <span class="ag-toggle-slider"></span>
+      </label>
+    </div>`).join('');
+}
+
+async function toggleNotif(id,val){
+  agendaNotifs[id]=val;
+  await db.ref(`users/${currentUID}/agenda/notifs/${id}`).set(val);
+  if(val)scheduleNotifs();
+}
+
+function requestNotifPermission(){
+  if(!('Notification' in window)){chAlert('error','Não suportado','Seu navegador não suporta notificações.');return;}
+  Notification.requestPermission().then(p=>{
+    if(p==='granted'){chAlert('success','Notificações autorizadas!','Você receberá alertas conforme configurado.');scheduleNotifs();}
+    else chAlert('info','Permissão negada','Você pode autorizar nas configurações do navegador.');
+  });
+}
+
+function scheduleNotifs(){
+  if(typeof Notification==='undefined'||Notification.permission!=='granted')return;
+  // Basic scheduling — show notification for items due today
+  const today=new Date();
+  agendaMeds.forEach(m=>{
+    if(!agendaNotifs[m.id])return;
+    const due=m.freq==='diario'||m.days.includes(today.getDay());
+    if(due)new Notification('💊 '+m.name,{body:m.time+(m.qty?' · '+m.qty:''),icon:'/favicon.ico'});
+  });
+}
+
 /* ── TEST DATA ── */
 function loadTestData(){
   const today=new Date();
@@ -492,6 +733,57 @@ body{font-family:'Inter',sans-serif;color:var(--t1);max-width:430px;margin:0 aut
 .hdr-right{display:flex;align-items:center;gap:10px}
 .bell{position:relative;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.07);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--t1)}
 .bell-dot{position:absolute;top:7px;right:7px;width:7px;height:7px;background:var(--cyan);border-radius:50%;border:2px solid var(--bg)}
+
+/* AGENDA PANEL */
+#agenda-modal{display:none;position:fixed;inset:0;z-index:400;align-items:flex-end;justify-content:center}
+#agenda-modal.open{display:flex}
+.ag-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(4px)}
+.ag-box{position:relative;background:#0F172A;border-radius:24px 24px 0 0;width:100%;max-width:430px;z-index:1;animation:dpIn .25s ease;display:flex;flex-direction:column;max-height:88vh}
+.ag-header{padding:18px 20px 0;flex-shrink:0}
+.ag-title{font-size:18px;font-weight:700;margin-bottom:14px}
+.ag-tabs{display:flex;gap:6px;margin-bottom:0;border-bottom:1px solid rgba(255,255,255,.07);padding-bottom:0}
+.ag-tab{flex:1;background:none;border:none;border-bottom:2px solid transparent;padding:9px 4px;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;color:var(--t3);cursor:pointer;margin-bottom:-1px;transition:color .15s}
+.ag-tab.active{color:var(--cyan);border-bottom-color:var(--cyan)}
+.ag-body{flex:1;overflow-y:auto;padding:16px 20px 32px}
+.ag-section{display:none}
+.ag-section.active{display:block}
+.ag-empty{text-align:center;color:var(--t3);font-size:13px;padding:32px 0}
+.ag-item{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:14px;margin-bottom:10px}
+.ag-item-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px}
+.ag-item-name{font-size:15px;font-weight:700}
+.ag-item-dose{font-size:12px;color:var(--cyan);font-weight:600;margin-top:2px}
+.ag-item-rows{display:flex;flex-direction:column;gap:5px}
+.ag-item-row{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--t2)}
+.ag-item-del{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:8px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--red);flex-shrink:0}
+.ag-add-btn{width:100%;background:rgba(37,99,235,.12);border:1px dashed rgba(37,99,235,.4);border-radius:14px;padding:13px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;color:var(--cyan);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:4px}
+.ag-form{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px;margin-bottom:12px;display:none}
+.ag-form.open{display:block}
+.ag-field{margin-bottom:10px}
+.ag-label{font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px}
+.ag-input{width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:9px 12px;color:var(--t1);font-family:'Inter',sans-serif;font-size:13px;outline:none}
+.ag-select{width:100%;background:#1E293B;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:9px 12px;color:var(--t1);font-family:'Inter',sans-serif;font-size:13px;outline:none;-webkit-appearance:none;appearance:none}
+.ag-days{display:flex;gap:5px;flex-wrap:wrap}
+.ag-day{width:36px;height:36px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);font-size:11px;font-weight:600;color:var(--t3);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.ag-day.sel{background:rgba(6,182,212,.15);border-color:rgba(6,182,212,.4);color:var(--cyan)}
+.ag-form-btns{display:flex;gap:8px;margin-top:12px}
+.ag-form-cancel{flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;color:var(--t2);cursor:pointer}
+.ag-form-save{flex:2;background:linear-gradient(135deg,#2563EB,#06B6D4);border:none;border-radius:10px;padding:10px;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;color:#fff;cursor:pointer}
+.ag-notif-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.ag-notif-row:last-child{border-bottom:none}
+.ag-toggle{position:relative;width:44px;height:24px;flex-shrink:0}
+.ag-toggle input{opacity:0;width:0;height:0}
+.ag-toggle-slider{position:absolute;inset:0;background:rgba(255,255,255,.12);border-radius:12px;cursor:pointer;transition:.2s}
+.ag-toggle-slider::before{content:'';position:absolute;width:18px;height:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+.ag-toggle input:checked+.ag-toggle-slider{background:linear-gradient(135deg,#2563EB,#06B6D4)}
+.ag-toggle input:checked+.ag-toggle-slider::before{transform:translateX(20px)}
+.cycle-next{background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.15);border-radius:10px;padding:10px 12px;margin-top:8px}
+.cycle-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:3px 0}
+.cycle-label{color:var(--t3)}
+.cycle-val{color:var(--t1);font-weight:600}
+.cycle-badge{font-size:10px;font-weight:700;border-radius:6px;padding:2px 7px}
+.cycle-pico{background:rgba(239,68,68,.15);color:#EF4444}
+.cycle-vale{background:rgba(245,158,11,.15);color:#F59E0B}
+.cycle-dose{background:rgba(16,185,129,.15);color:#10B981}
 .avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#2563EB,#06B6D4);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#fff;border:2px solid rgba(6,182,212,.35)}
 
 /* GREETING */
@@ -896,6 +1188,125 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
   </div>
 </div>
 
+<!-- AGENDA MODAL -->
+<div id="agenda-modal">
+  <div class="ag-backdrop" onclick="closeAgenda()"></div>
+  <div class="ag-box">
+    <div class="ag-header">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div class="ag-title">📋 Agenda de saúde</div>
+        <button onclick="closeAgenda()" style="background:rgba(255,255,255,.07);border:none;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--t2);font-size:16px">✕</button>
+      </div>
+      <div class="ag-tabs">
+        <button class="ag-tab active" onclick="agTab('meds')">💊 Medicamentos</button>
+        <button class="ag-tab" onclick="agTab('cycles')">💉 Aplicações</button>
+        <button class="ag-tab" onclick="agTab('notifs')">🔔 Notificações</button>
+      </div>
+    </div>
+    <div class="ag-body">
+
+      <!-- MEDICAMENTOS -->
+      <div class="ag-section active" id="ag-meds">
+        <div id="meds-list"></div>
+        <div class="ag-form" id="med-form">
+          <div class="ag-field"><div class="ag-label">Nome do medicamento</div><input class="ag-input" id="mf-name" placeholder="Ex: Vitamina D"></div>
+          <div class="ag-field"><div class="ag-label">Dose</div><input class="ag-input" id="mf-dose" placeholder="Ex: 10000 UI"></div>
+          <div class="ag-field">
+            <div class="ag-label">Frequência</div>
+            <select class="ag-select" id="mf-freq" onchange="toggleMedDays()">
+              <option value="diario">Todos os dias</option>
+              <option value="semanal">Dias específicos</option>
+            </select>
+          </div>
+          <div class="ag-field" id="mf-days-wrap" style="display:none">
+            <div class="ag-label">Dias da semana</div>
+            <div class="ag-days">
+              <div class="ag-day" data-d="0" onclick="toggleDay(this)">Dom</div>
+              <div class="ag-day" data-d="1" onclick="toggleDay(this)">Seg</div>
+              <div class="ag-day" data-d="2" onclick="toggleDay(this)">Ter</div>
+              <div class="ag-day" data-d="3" onclick="toggleDay(this)">Qua</div>
+              <div class="ag-day" data-d="4" onclick="toggleDay(this)">Qui</div>
+              <div class="ag-day" data-d="5" onclick="toggleDay(this)">Sex</div>
+              <div class="ag-day" data-d="6" onclick="toggleDay(this)">Sáb</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <div class="ag-field" style="flex:1"><div class="ag-label">Horário</div>
+              <select class="ag-select" id="mf-time">
+                <option value="Café da manhã">☕ Café da manhã</option>
+                <option value="Almoço">🍽 Almoço</option>
+                <option value="Jantar">🌙 Jantar</option>
+                <option value="Antes de dormir">😴 Antes de dormir</option>
+                <option value="Outro">Outro horário</option>
+              </select>
+            </div>
+            <div class="ag-field" style="flex:1"><div class="ag-label">Qtd / unidade</div><input class="ag-input" id="mf-qty" placeholder="Ex: 1 cápsula"></div>
+          </div>
+          <div class="ag-form-btns">
+            <button class="ag-form-cancel" onclick="closeMedForm()">Cancelar</button>
+            <button class="ag-form-save" onclick="saveMed()">Salvar</button>
+          </div>
+        </div>
+        <button class="ag-add-btn" id="med-add-btn" onclick="openMedForm()">+ Adicionar medicamento</button>
+      </div>
+
+      <!-- APLICAÇÕES -->
+      <div class="ag-section" id="ag-cycles">
+        <div id="cycles-list"></div>
+        <div class="ag-form" id="cycle-form">
+          <div class="ag-field"><div class="ag-label">Nome</div><input class="ag-input" id="cf-name" placeholder="Ex: Testosterona Cipionato"></div>
+          <div class="ag-field">
+            <div class="ag-label">Tipo de ciclo</div>
+            <select class="ag-select" id="cf-type" onchange="toggleCycleType()">
+              <option value="interval">A cada N dias</option>
+              <option value="weekdays">Dias fixos da semana</option>
+            </select>
+          </div>
+          <div class="ag-field" id="cf-interval-wrap">
+            <div class="ag-label">Intervalo (dias)</div>
+            <input class="ag-input" id="cf-interval" type="number" min="1" max="90" placeholder="Ex: 5">
+          </div>
+          <div class="ag-field" id="cf-weekdays-wrap" style="display:none">
+            <div class="ag-label">Dias da semana</div>
+            <div class="ag-days" id="cf-days">
+              <div class="ag-day" data-d="0" onclick="toggleDay(this)">Dom</div>
+              <div class="ag-day" data-d="1" onclick="toggleDay(this)">Seg</div>
+              <div class="ag-day" data-d="2" onclick="toggleDay(this)">Ter</div>
+              <div class="ag-day" data-d="3" onclick="toggleDay(this)">Qua</div>
+              <div class="ag-day" data-d="4" onclick="toggleDay(this)">Qui</div>
+              <div class="ag-day" data-d="5" onclick="toggleDay(this)">Sex</div>
+              <div class="ag-day" data-d="6" onclick="toggleDay(this)">Sáb</div>
+            </div>
+          </div>
+          <div class="ag-field"><div class="ag-label">Data da última aplicação</div><input class="ag-input" id="cf-lastdate" type="date"></div>
+          <div class="ag-field" style="display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <div class="ag-label" style="margin-bottom:0">Monitorar Pico e Vale</div>
+              <div style="font-size:11px;color:var(--t3);margin-top:2px">Pico 48h após · Vale no último dia</div>
+            </div>
+            <label class="ag-toggle"><input type="checkbox" id="cf-peakvalley" checked><span class="ag-toggle-slider"></span></label>
+          </div>
+          <div class="ag-form-btns">
+            <button class="ag-form-cancel" onclick="closeCycleForm()">Cancelar</button>
+            <button class="ag-form-save" onclick="saveCycle()">Salvar</button>
+          </div>
+        </div>
+        <button class="ag-add-btn" id="cycle-add-btn" onclick="openCycleForm()">+ Adicionar aplicação</button>
+      </div>
+
+      <!-- NOTIFICAÇÕES -->
+      <div class="ag-section" id="ag-notifs">
+        <div style="background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.2);border-radius:12px;padding:12px;margin-bottom:16px;font-size:12px;color:var(--t2);line-height:1.6">
+          As notificações funcionam via navegador. Você precisará autorizar quando solicitado.
+        </div>
+        <div id="notifs-list"></div>
+        <button onclick="requestNotifPermission()" style="width:100%;background:linear-gradient(135deg,#2563EB,#06B6D4);border:none;border-radius:12px;padding:12px;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;color:#fff;cursor:pointer;margin-top:8px">🔔 Autorizar notificações</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 <!-- CONFIRM DELETE MODAL -->
 <div id="confirm-modal">
   <div class="cm-backdrop" onclick="closeConfirmModal()"></div>
@@ -939,9 +1350,8 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
         <div><div class="logo-name">Chronia</div><div class="logo-sub">Sua saúde através do tempo</div></div>
       </div>
       <div class="hdr-right">
-        <button class="bell">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-          <span class="bell-dot"></span>
+        <button class="bell" onclick="openAgenda()" title="Agenda de saúde">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="16" y1="14" x2="16" y2="14"/></svg>
         </button>
         <div class="avatar" id="avatar-el">C</div>
       </div>
