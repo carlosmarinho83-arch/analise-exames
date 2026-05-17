@@ -1121,7 +1121,7 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
           <div style="font-size:16px;font-weight:700">Exames em destaque</div>
           <div style="font-size:12px;color:var(--t2);margin-top:3px">Aparecem no anel da tela inicial</div>
         </div>
-        <button onclick="saveFeatured()" style="background:linear-gradient(135deg,#2563EB,#06B6D4);border:none;color:#fff;border-radius:8px;padding:8px 16px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer">Salvar</button>
+        <button id="featured-save-btn" onclick="saveFeatured()" style="background:linear-gradient(135deg,#2563EB,#06B6D4);border:none;color:#fff;border-radius:8px;padding:8px 16px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer">Salvar</button>
       </div>
       <div id="featured-list"></div>
     </div>
@@ -1599,6 +1599,21 @@ function fdShort(str){if(!str)return'—';const[y,m]=(str+'').split('-');const m
 function showErr(m){const el=document.getElementById('error-msg');el.textContent='⚠ '+m;el.style.display='block';setTimeout(()=>el.style.display='none',4000);}
 function hideErr(){document.getElementById('error-msg').style.display='none';}
 function sw(n){
+  // Warn if leaving perfil with unsaved featured changes
+  if(curNav==='perfil' && n!=='perfil' && !featuredSaved){
+    chConfirm('Alterações não salvas','Você mudou os exames em destaque mas não salvou. Deseja sair mesmo assim?',()=>{
+      featuredSaved=true;
+      // Reload from Firebase to reset unsaved changes
+      loadFeatured();
+      doSw(n);
+    });
+    // Also add a cancel that stays on perfil
+    return;
+  }
+  doSw(n);
+}
+
+function doSw(n){
   curNav=n;
   ['inicio','exames','graficos','insights','perfil'].forEach(p=>{
     document.getElementById('nav-'+p).classList.toggle('active',p===n);
@@ -1628,6 +1643,7 @@ const DEFAULT_FEATURED = [
 ];
 
 let featuredList = [];
+let featuredSaved = true;
 let carIdx = 0;
 let carTimer = null;
 let carItems = [];
@@ -1635,8 +1651,12 @@ let carItems = [];
 function loadFeatured() {
   if(!window.fbLoad) return;
   db.ref(`users/${currentUID}/featured`).get().then(snap => {
-    if(snap.exists()) featuredList = snap.val().filter(f=>f&&f.search);
-    else featuredList = [];
+    if(snap.exists()){
+      featuredList = snap.val().filter(f=>f&&f.search);
+    } else {
+      featuredList = [];
+    }
+    featuredSaved = true;
     rFeaturedList();
     startCarousel();
   }).catch(()=>{ featuredList=[]; rFeaturedList(); startCarousel(); });
@@ -1645,11 +1665,11 @@ function loadFeatured() {
 window.saveFeatured = async () => {
   try {
     await db.ref(`users/${currentUID}/featured`).set(featuredList);
+    featuredSaved = true;
     startCarousel();
-    const btn = event.target;
-    btn.textContent = '✓ Salvo!';
-    setTimeout(()=>btn.textContent='Salvar', 1500);
-  } catch(e) { console.error(e); }
+    rFeaturedList();
+    chAlert('success','Exames salvos!','Sua seleção foi salva e já aparece no anel da tela inicial.');
+  } catch(e) { chAlert('error','Erro ao salvar',e.message); }
 };
 
 function getAvailableExams() {
@@ -1665,6 +1685,12 @@ function rFeaturedList() {
   if(!allExams.length){
     container.innerHTML='<div style="font-size:13px;color:var(--t3);text-align:center;padding:16px 0">Importe laudos para selecionar exames.</div>';
     return;
+  }
+  // Update save button to reflect unsaved state
+  const saveBtn=document.getElementById('featured-save-btn');
+  if(saveBtn){
+    saveBtn.textContent=featuredSaved?'Salvar':'Salvar ●';
+    saveBtn.style.background=featuredSaved?'linear-gradient(135deg,#2563EB,#06B6D4)':'linear-gradient(135deg,#D97706,#F59E0B)';
   }
 
   const filled = featuredList.filter(f=>f&&f.search);
@@ -1714,12 +1740,14 @@ window.onFeaturedChange = (i, sel) => {
     featuredList.splice(i, 1);
   }
   featuredList = featuredList.filter(f=>f&&f.search);
+  featuredSaved = false;
   rFeaturedList();
 };
 
 window.removeFeatured = (i) => {
   featuredList.splice(i, 1);
   featuredList = featuredList.filter(f=>f&&f.search);
+  featuredSaved = false;
   rFeaturedList();
 };
 
