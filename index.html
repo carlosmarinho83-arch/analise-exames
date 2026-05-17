@@ -129,7 +129,7 @@ function closeProfileModal(){
 
 function openImport(){
   if(!checkProfileComplete())return;
-  openImport();
+  document.getElementById('fi').click();
 }
 
 /* ── CHRONIA TOAST ── */
@@ -260,6 +260,19 @@ async function saveRefEdit(){
   }catch(e){chAlert('error','Erro ao salvar',e.message);}
 }
 
+function validarCPF(cpf){
+  cpf=cpf.replace(/[^\d]/g,'');
+  if(cpf.length!==11||/^(\d)\1{10}$/.test(cpf))return false;
+  let s=0;
+  for(let i=0;i<9;i++)s+=parseInt(cpf[i])*(10-i);
+  let r=11-(s%11);if(r>=10)r=0;
+  if(r!==parseInt(cpf[9]))return false;
+  s=0;
+  for(let i=0;i<10;i++)s+=parseInt(cpf[i])*(11-i);
+  r=11-(s%11);if(r>=10)r=0;
+  return r===parseInt(cpf[10]);
+}
+
 function formatCPF(input){
   let v=input.value.replace(/\D/g,'').slice(0,11);
   if(v.length>9)v=v.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/,'$1.$2.$3-$4');
@@ -275,6 +288,7 @@ window.saveProfile = async () => {
   const weight = document.getElementById('pf-weight').value;
   const height = document.getElementById('pf-height').value;
   const cpf = document.getElementById('pf-cpf').value.trim();
+  if(cpf && !validarCPF(cpf)){chAlert('error','CPF inválido','O CPF informado não é válido. Verifique e tente novamente.');return;}
   if(!name){chAlert('error','Nome obrigatório','Digite seu nome completo.');return;}
   if(!birthdate){chAlert('error','Data obrigatória','Informe sua data de nascimento.');return;}
   const age = birthdate ? calcAge(birthdate) : null;
