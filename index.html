@@ -1037,17 +1037,19 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
             <input id="pf-height" type="number" placeholder="Ex: 175" min="50" max="250" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 12px;color:var(--t1);font-family:'Inter',sans-serif;font-size:14px;margin-top:6px;outline:none">
           </div>
         </div>
-        <div>
-          <label style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">Data de nascimento</label>
-          <div onclick="openDatePicker()" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 12px;color:var(--t1);font-family:'Inter',sans-serif;font-size:14px;margin-top:6px;cursor:pointer;display:flex;align-items:center;height:42px;box-sizing:border-box" id="pf-birthdate-display">
-            <span id="pf-birthdate-text" style="color:var(--t3)">Selecionar data</span>
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <div style="flex:1.2">
+            <label style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">Data de nascimento</label>
+            <div onclick="openDatePicker()" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 12px;color:var(--t1);font-family:'Inter',sans-serif;font-size:14px;margin-top:6px;cursor:pointer;display:flex;align-items:center;height:42px;box-sizing:border-box" id="pf-birthdate-display">
+              <span id="pf-birthdate-text" style="color:var(--t3)">Selecionar data</span>
+            </div>
+            <input id="pf-birthdate" type="hidden">
+            <div id="pf-age-display" style="font-size:12px;color:var(--cyan);margin-top:5px;font-weight:600;min-height:18px"></div>
           </div>
-          <input id="pf-birthdate" type="hidden">
-          <div id="pf-age-display" style="font-size:12px;color:var(--cyan);margin-top:5px;font-weight:600;min-height:18px"></div>
-        </div>
-        <div>
-          <label style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">CPF <span style="color:var(--t3);font-weight:400;text-transform:none">(opcional)</span></label>
-          <input id="pf-cpf" type="text" placeholder="000.000.000-00" maxlength="14" oninput="formatCPF(this)" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 12px;color:var(--t1);font-family:'Inter',sans-serif;font-size:14px;margin-top:6px;outline:none">
+          <div style="flex:1">
+            <label style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">CPF <span style="color:var(--t3);font-weight:400;text-transform:none">(opcional)</span></label>
+            <input id="pf-cpf" type="text" placeholder="000.000.000-00" maxlength="14" oninput="formatCPF(this)" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 12px;color:var(--t1);font-family:'Inter',sans-serif;font-size:14px;margin-top:6px;outline:none;height:42px;box-sizing:border-box">
+          </div>
         </div>
       </div>
     </div>
