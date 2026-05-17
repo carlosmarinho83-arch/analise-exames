@@ -387,28 +387,45 @@ function getSchedules(){
 
 function setQty(v){document.getElementById('mf-qty').value=v;}
 
-function openMedForm(med=null){
+function openMedForm(med=null, afterId=null){
   _editMedId=med?med.id:null;
-  document.getElementById('med-form').classList.add('open');
-  document.getElementById('med-add-btn').style.display='none';
-  document.getElementById('mf-name').value=med?med.name:'';
-  document.getElementById('mf-dose').value=med?med.dose:'';
-  document.getElementById('mf-brand').value=med?med.brand||'':'';
-  if(med&&med.qty){
-    const parts=med.qty.split(' ');
-    document.getElementById('mf-qty-num').value=parts[0]||'';
-    const unitRaw=(parts.slice(1).join(' ')||'').replace(/s$/,'').toLowerCase();
-    document.getElementById('mf-qty-unit').value=unitRaw||'';
+  // Move form: if editing, insert after that card; else keep at bottom
+  const form=document.getElementById('med-form');
+  const addBtn=document.getElementById('med-add-btn');
+  const section=document.getElementById('ag-meds');
+  if(afterId){
+    const card=document.getElementById('med-card-'+afterId);
+    if(card){card.after(form);} else {section.insertBefore(form,addBtn);}
   } else {
-    document.getElementById('mf-qty-num').value='';
-    document.getElementById('mf-qty-unit').value='';
+    section.insertBefore(form,addBtn);
   }
-  document.getElementById('mf-freq').value=med?med.freq:'diario';
-  document.getElementById('mf-time').value=med?med.time:'Café da manhã';
+  form.classList.add('open');
+  addBtn.style.display='none';
+  // Populate fields
+  document.getElementById('mf-name').value=med?med.name:'';
+  document.getElementById('mf-dose').value=med?med.dose||'':'';
+  document.getElementById('mf-brand').value=med?med.brand||'':'';
+  document.getElementById('mf-formula').value=med?med.formula||'':'';
+  document.getElementById('mf-freq').value=med?med.freq||'diario':'diario';
   document.querySelectorAll('#med-form .ag-day').forEach(d=>{
     d.classList.toggle('sel',med&&med.days&&med.days.includes(Number(d.dataset.d)));
   });
   toggleMedDays();
+  // Schedules
+  if(med&&med.schedules&&med.schedules.length){
+    _schedData=med.schedules.map(s=>{
+      const parts=(s.qty||'').split(' ');
+      return{time:s.time||'',qtyNum:parts[0]||'',qtyUnit:(parts.slice(1).join(' ')||'').replace(/s$/,'').toLowerCase()};
+    });
+  } else if(med&&med.time){
+    const parts=(med.qty||'').split(' ');
+    _schedData=[{time:med.time,qtyNum:parts[0]||'',qtyUnit:parts.slice(1).join(' ').replace(/s$/,'').toLowerCase()}];
+  } else {
+    _schedData=[{time:'',qtyNum:'',qtyUnit:''}];
+  }
+  rSchedules();
+  // Scroll form into view
+  setTimeout(()=>form.scrollIntoView({behavior:'smooth',block:'start'}),100);
 }
 function closeMedForm(){
   document.getElementById('med-form').classList.remove('open');
@@ -459,7 +476,7 @@ function renderMeds(){
   if(!agendaMeds.length){el.innerHTML='<div class="ag-empty">Nenhum medicamento cadastrado.</div>';return;}
   el.innerHTML=agendaMeds.map(m=>{
     const freqTxt=m.freq==='diario'?'Todos os dias':m.days.map(d=>DAYS_PT[d]).join(', ');
-    return`<div class="ag-item">
+    return`<div class="ag-item" id="med-card-${m.id}">
       <div class="ag-item-top">
         <div>
           <div class="ag-item-name">${m.name}</div>
@@ -467,7 +484,7 @@ function renderMeds(){
           <div class="ag-item-dose">${m.dose||''}</div>
         </div>
         <div class="ag-item-actions">
-          <div class="ag-item-edit" onclick="openMedForm(${JSON.stringify(m).replace(/"/g,'&quot;')})">
+          <div class="ag-item-edit" onclick="openMedForm(${JSON.stringify(m).replace(/"/g,'&quot;')},'${m.id}')">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </div>
           <div class="ag-item-del" onclick="confirmDeleteMed('${m.id}')">
@@ -478,7 +495,7 @@ function renderMeds(){
       <div class="ag-item-rows">
         <div class="ag-item-row"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>${freqTxt}</div>
         ${(m.schedules||[{time:m.time||'',qty:m.qty||''}]).map(s=>`<div class="ag-item-row"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${s.time}${s.qty?' · '+s.qty:''}</div>`).join('')}
-        ${m.formula&&m.formula.trim()?`<div class="ag-item-row" onclick="openFormulaBalloon(this,'${m.formula.replace(/'/g,"\'")}');event.stopPropagation()" style="margin-top:4px;padding-top:8px;border-top:1px solid rgba(255,255,255,.06);cursor:pointer"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18"/></svg><span style="color:var(--cyan);font-size:11px;font-weight:600">Fórmula manipulada</span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2.5" stroke-linecap="round" style="margin-left:auto;opacity:.6"><polyline points="6 9 12 15 18 9"/></svg></div>`:''}
+        ${m.formula&&typeof m.formula==='string'&&m.formula.trim()?`<div class="ag-item-row" onclick="openFormulaBalloon(this,'${m.formula.replace(/'/g,"\'")}');event.stopPropagation()" style="margin-top:4px;padding-top:8px;border-top:1px solid rgba(255,255,255,.06);cursor:pointer"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18"/></svg><span style="color:var(--cyan);font-size:11px;font-weight:600">Fórmula manipulada</span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2.5" stroke-linecap="round" style="margin-left:auto;opacity:.6"><polyline points="6 9 12 15 18 9"/></svg></div>`:''}
       </div>
     </div>`;
   }).join('');
