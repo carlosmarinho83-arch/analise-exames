@@ -223,6 +223,43 @@ function buildCol(id,items,selected,onChange){
   };
 }
 
+/* ── REF EDIT ── */
+let _reExamId=null,_reExamName=null;
+function openRefEdit(examId,examName,event){
+  if(event)event.stopPropagation();
+  _reExamId=examId;_reExamName=examName;
+  document.getElementById('re-exam-name').textContent=examName;
+  // Pre-fill if already has partial ref
+  const exam=window.exams.find(e=>String(e.id)===String(examId));
+  const r=exam&&(exam.results||[]).find(x=>x.name===examName);
+  document.getElementById('re-min').value=r&&r.refMin!=null?r.refMin:'';
+  document.getElementById('re-max').value=r&&r.refMax!=null?r.refMax:'';
+  document.getElementById('ref-edit-modal').classList.add('open');
+}
+function closeRefEdit(){document.getElementById('ref-edit-modal').classList.remove('open');}
+async function saveRefEdit(){
+  const min=document.getElementById('re-min').value;
+  const max=document.getElementById('re-max').value;
+  if(!min&&!max){chAlert('error','Campos vazios','Informe pelo menos um valor de referência.');return;}
+  const exam=window.exams.find(e=>String(e.id)===String(_reExamId));
+  if(!exam)return;
+  const r=(exam.results||[]).find(x=>x.name===_reExamName);
+  if(!r)return;
+  r.refMin=min!==''?parseFloat(min):null;
+  r.refMax=max!==''?parseFloat(max):null;
+  if(r.refMin!=null&&r.refMax!=null){
+    if(r.value>r.refMax)r.status='alto';
+    else if(r.value<r.refMin)r.status='baixo';
+    else r.status='normal';
+  }
+  try{
+    await window.fbSave(exam);
+    closeRefEdit();
+    render();
+    chAlert('success','Referência salva!','O status do exame foi atualizado.');
+  }catch(e){chAlert('error','Erro ao salvar',e.message);}
+}
+
 function formatCPF(input){
   let v=input.value.replace(/\D/g,'').slice(0,11);
   if(v.length>9)v=v.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/,'$1.$2.$3-$4');
@@ -281,8 +318,8 @@ function updateAgeDisplay(){
   disp.textContent=age!=null?age+' anos':'';
 }
 
-window.doLogout = async () => {
-  chConfirm('Sair da conta?','Você será desconectado do Chronia.',()=>{
+window.doLogout = () => {
+  chConfirm('Sair da conta?','Você será desconectado do Chronia.',async()=>{
     await auth.signOut();
     window.exams = [];
   });
@@ -543,6 +580,21 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
 .ct-btn-cancel{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1)!important;color:var(--t2)}
 .ct-btn-danger{background:linear-gradient(135deg,#EF4444,#DC2626);color:#fff}
 
+/* REF EDIT MODAL */
+#ref-edit-modal{display:none;position:fixed;inset:0;z-index:400;align-items:center;justify-content:center;padding:24px}
+#ref-edit-modal.open{display:flex}
+.re-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px)}
+.re-box{position:relative;background:linear-gradient(160deg,#0C1E3D,#0F2847);border:1px solid rgba(245,158,11,.2);border-radius:22px;padding:26px 22px;width:100%;max-width:360px;z-index:1;animation:pmIn .2s ease}
+.re-title{font-size:16px;font-weight:700;margin-bottom:4px}
+.re-name{font-size:13px;color:var(--cyan);font-weight:600;margin-bottom:16px}
+.re-row{display:flex;gap:10px;margin-bottom:12px}
+.re-field{flex:1}
+.re-label{font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
+.re-input{width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 12px;color:var(--t1);font-family:'Inter',sans-serif;font-size:15px;outline:none}
+.re-actions{display:flex;gap:10px;margin-top:18px}
+.re-btn-cancel{flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:12px;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;color:var(--t2);cursor:pointer}
+.re-btn-save{flex:2;background:linear-gradient(135deg,#2563EB,#06B6D4);border:none;border-radius:12px;padding:12px;font-family:'Inter',sans-serif;font-size:14px;font-weight:700;color:#fff;cursor:pointer}
+
 /* DATE PICKER MODAL */
 #date-picker-modal{display:none;position:fixed;inset:0;z-index:400;align-items:flex-end;justify-content:center}
 #date-picker-modal.open{display:flex}
@@ -692,6 +744,35 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
     <div class="ct-title" id="ct-title"></div>
     <div class="ct-msg" id="ct-msg"></div>
     <div class="ct-actions" id="ct-actions"></div>
+  </div>
+</div>
+
+<!-- REF EDIT MODAL -->
+<div id="ref-edit-modal">
+  <div class="re-backdrop" onclick="closeRefEdit()"></div>
+  <div class="re-box">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+      <div style="width:36px;height:36px;border-radius:10px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
+      <div class="re-title">Referência não encontrada</div>
+    </div>
+    <div class="re-name" id="re-exam-name"></div>
+    <div style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.5">A IA não encontrou os valores de referência para este exame. Informe manualmente:</div>
+    <div class="re-row">
+      <div class="re-field">
+        <div class="re-label">Mín (refMin)</div>
+        <input class="re-input" id="re-min" type="number" placeholder="Ex: 10">
+      </div>
+      <div class="re-field">
+        <div class="re-label">Máx (refMax)</div>
+        <input class="re-input" id="re-max" type="number" placeholder="Ex: 40">
+      </div>
+    </div>
+    <div class="re-actions">
+      <button class="re-btn-cancel" onclick="closeRefEdit()">Cancelar</button>
+      <button class="re-btn-save" onclick="saveRefEdit()">Salvar referência</button>
+    </div>
   </div>
 </div>
 
@@ -1100,15 +1181,28 @@ async function claude(b64,fn){
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:8000,
-      system:`Você é um extrator especializado em laudos médicos laboratoriais. Sua única função é extrair dados e retornar JSON válido.
+      system:`Você é um extrator especializado em laudos médicos laboratoriais brasileiros. Sua única função é extrair dados estruturados e retornar JSON válido. Nenhum texto fora do JSON é permitido.
 
-REGRAS OBRIGATÓRIAS:
-1. Retorne APENAS JSON puro — sem markdown, sem texto, sem explicações.
-2. Extraia TODOS os exames presentes no laudo, sem exceção.
-3. Para refMin e refMax: procure no laudo por "Valor de Referência", "VR", "Referência", "Ref.", "Valores de referência", intervalos como "10 - 20", "até 40", "maior que 5". Se encontrar, converta para número. Se não encontrar, use null.
-4. Para status: compare o value com refMin/refMax. Se value > refMax use "alto". Se value < refMin use "baixo". Se dentro do intervalo use "normal". Se sem referência use "indeterminado".
-5. Para value: use sempre número (float ou int), nunca string.
-6. Formato obrigatório: {"date":"YYYY-MM-DD ou null","lab":"nome do laboratório ou null","patient":"nome do paciente ou null","results":[{"name":"nome do exame","value":numero,"unit":"unidade de medida","refMin":numero_ou_null,"refMax":numero_ou_null,"status":"normal|alto|baixo|indeterminado"}]}`,
+REGRAS ABSOLUTAS — SIGA TODAS SEM EXCEÇÃO:
+
+1. FORMATO DE SAÍDA: Retorne APENAS JSON puro. Sem markdown, sem texto, sem comentários, sem quebras antes do JSON.
+
+2. EXTRAIA TODOS OS EXAMES: Cada linha ou item com nome e valor numérico é um exame. Não pule nenhum.
+
+3. VALORES DE REFERÊNCIA — PRIORIDADE MÁXIMA:
+   - Procure em TODA a área ao redor do resultado: à direita, abaixo, em colunas separadas, em notas de rodapé, em cabeçalhos de seção.
+   - Padrões a reconhecer: "VR:", "Ref.:", "Referência:", "Valores de referência:", "Normal:", intervalos "10,0 - 40,0", "10.0 - 40.0", "10 a 40", "< 40", "até 40", "> 5", "acima de 5", "menor que", "maior que".
+   - Expressões como "até 40" → refMin=null, refMax=40. "maior que 5" → refMin=5, refMax=null. "10 a 40" → refMin=10, refMax=40.
+   - Vírgula decimal brasileira: "1,38" = 1.38 em float.
+   - Se o laudo tiver tabela com coluna de referência, leia cada linha individualmente.
+   - Só use null quando absolutamente não houver nenhuma referência em lugar algum do documento para aquele exame.
+
+4. STATUS: Compare value com refMin/refMax. value > refMax → "alto". value < refMin → "baixo". Entre os dois → "normal". Sem referência → "indeterminado".
+
+5. VALUE: Sempre número (float ou int). Nunca string. Converta vírgula para ponto.
+
+6. FORMATO OBRIGATÓRIO:
+{"date":"YYYY-MM-DD ou null","lab":"nome do laboratório ou null","patient":"nome do paciente ou null","results":[{"name":"nome completo do exame","value":numero,"unit":"unidade","refMin":numero_ou_null,"refMax":numero_ou_null,"status":"normal|alto|baixo|indeterminado"}]}`,
       messages:[{role:'user',content:[
         {type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},
         {type:'text',text:(()=>{
@@ -1277,11 +1371,15 @@ function rExames(){
           const si=statusInfo(r.status);
           const col=eColor(r.name);
           const dotColor=si.cls==='b-normal'?'#10B981':si.cls==='b-low'||si.cls==='b-high'?'#EF4444':si.cls==='b-attention'?'#F59E0B':'#64748B';
+          const hasRef=r.refMin!=null||r.refMax!=null;
+          const refCell=hasRef
+            ?`<span style="color:var(--t3)">${r.refMin!=null?r.refMin:'?'}–${r.refMax!=null?r.refMax:'?'}</span>`
+            :`<button onclick="openRefEdit('${exam.id}','${r.name.replace(/'/g,"\'")}',event)" style="display:inline-flex;align-items:center;gap:4px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);border-radius:6px;padding:3px 8px;cursor:pointer;font-family:'Inter',sans-serif;font-size:11px;font-weight:600;color:#F59E0B"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Preencher</button>`;
           return`<tr>
             <td style="color:var(--t1)">${r.name}</td>
             <td><span style="display:inline-flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:${dotColor};flex-shrink:0"></span><span class="val-td" style="color:${col}">${fv(r.value)}</span></span></td>
             <td style="color:var(--t4)">${r.unit||'—'}</td>
-            <td style="color:var(--t3)">${r.refMin!=null&&r.refMax!=null?r.refMin+'–'+r.refMax:'—'}</td>
+            <td>${refCell}</td>
           </tr>`;
         }).join('')}</tbody>
       </table></div></div>`;
