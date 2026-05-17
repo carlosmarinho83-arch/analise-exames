@@ -112,10 +112,18 @@ function checkProfileComplete(){
     if(!p.sex)missing.push('Sexo');
     if(!p.age)missing.push('Idade');
     if(!p.weight)missing.push('Peso');
-    showErr('Preencha seu perfil antes de importar: '+missing.join(', ')+'. Acesse a aba Perfil.');
+    const list=document.getElementById('pm-missing-list');
+    if(list)list.innerHTML=missing.map(m=>`<div class="pm-missing-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>${m}</div>`).join('');
+    const modal=document.getElementById('profile-modal');
+    if(modal)modal.classList.add('open');
     return false;
   }
   return true;
+}
+
+function closeProfileModal(){
+  const modal=document.getElementById('profile-modal');
+  if(modal)modal.classList.remove('open');
 }
 
 function openImport(){
@@ -397,6 +405,20 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
 .lt{color:var(--cyan);font-size:14px;font-weight:600}
 .ls{color:var(--t2);font-size:12px;margin-top:2px}
 #error-msg{display:none;position:fixed;bottom:calc(var(--nav-h) + 10px);left:10px;right:10px;max-width:410px;margin:0 auto;z-index:200;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.25);border-radius:12px;padding:12px 16px;color:var(--red);font-size:13px}
+/* PROFILE REQUIRED MODAL */
+#profile-modal{display:none;position:fixed;inset:0;z-index:300;align-items:center;justify-content:center;padding:24px}
+#profile-modal.open{display:flex}
+.pm-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px)}
+.pm-box{position:relative;background:linear-gradient(160deg,#0C1E3D,#0F2847);border:1px solid rgba(6,182,212,.2);border-radius:24px;padding:28px 24px;width:100%;max-width:360px;z-index:1;animation:pmIn .2s ease}
+@keyframes pmIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.pm-icon{width:56px;height:56px;border-radius:16px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.2);display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+.pm-title{font-size:18px;font-weight:700;text-align:center;margin-bottom:8px}
+.pm-desc{font-size:13px;color:var(--t2);text-align:center;line-height:1.6;margin-bottom:6px}
+.pm-missing{display:flex;flex-direction:column;gap:6px;margin:16px 0}
+.pm-missing-item{display:flex;align-items:center;gap:8px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.15);border-radius:10px;padding:8px 12px;font-size:13px;color:#F87171}
+.pm-actions{display:flex;gap:10px;margin-top:20px}
+.pm-btn-cancel{flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:12px;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;color:var(--t2);cursor:pointer}
+.pm-btn-go{flex:2;background:linear-gradient(135deg,#2563EB,#06B6D4);border:none;border-radius:12px;padding:12px;font-family:'Inter',sans-serif;font-size:14px;font-weight:700;color:#fff;cursor:pointer}
 
 /* BOTTOM NAV */
 .bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;height:calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));padding-bottom:env(safe-area-inset-bottom, 0px);background:#0d1424;border-top:1px solid rgba(255,255,255,.08);display:flex;align-items:center;z-index:100}
@@ -490,6 +512,23 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
 <!-- LOADING -->
 <div id="loading"><div class="spinner"></div><div><div class="lt">Analisando laudo com IA…</div><div class="ls" id="lfn"></div></div></div>
 <div id="error-msg"></div>
+
+<!-- PROFILE REQUIRED MODAL -->
+<div id="profile-modal">
+  <div class="pm-backdrop" onclick="closeProfileModal()"></div>
+  <div class="pm-box">
+    <div class="pm-icon">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    </div>
+    <div class="pm-title">Perfil incompleto</div>
+    <div class="pm-desc">Para importar laudos, preencha os dados obrigatórios do seu perfil:</div>
+    <div class="pm-missing" id="pm-missing-list"></div>
+    <div class="pm-actions">
+      <button class="pm-btn-cancel" onclick="closeProfileModal()">Agora não</button>
+      <button class="pm-btn-go" onclick="closeProfileModal();sw('perfil')">Ir para o Perfil →</button>
+    </div>
+  </div>
+</div>
 
 <div class="page" id="page">
 
@@ -644,24 +683,7 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
       <div class="perfil-name" id="perfil-name">Carlos</div>
       <div class="perfil-sub">Minha conta Chronia</div>
     </div>
-    <div style="background:var(--card);border-radius:18px;padding:20px;border:1px solid rgba(255,255,255,.04);margin:12px 16px 0;cursor:pointer" onclick="doLogout()">
-      <div style="display:flex;align-items:center;gap:12px">
-        <div style="width:40px;height:40px;border-radius:10px;background:rgba(239,68,68,.12);display:flex;align-items:center;justify-content:center">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2" stroke-linecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-        </div>
-        <div style="font-size:15px;font-weight:600;color:#EF4444">Sair da conta</div>
-      </div>
-    </div>
-    <div style="background:var(--card);border-radius:18px;padding:20px;border:1px solid rgba(255,255,255,.04);margin:12px 16px 0">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-        <div>
-          <div style="font-size:16px;font-weight:700">Exames em destaque</div>
-          <div style="font-size:12px;color:var(--t2);margin-top:3px">Aparecem no anel da tela inicial</div>
-        </div>
-        <button onclick="saveFeatured()" style="background:linear-gradient(135deg,#2563EB,#06B6D4);border:none;color:#fff;border-radius:8px;padding:8px 16px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer">Salvar</button>
-      </div>
-      <div id="featured-list"></div>
-    </div>
+    <!-- Dados Pessoais -->
     <div style="background:var(--card);border-radius:18px;padding:20px;border:1px solid rgba(255,255,255,.04);margin:12px 16px 0">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
         <div>
@@ -693,6 +715,26 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
           <label style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">Peso (kg)</label>
           <input id="pf-weight" type="number" placeholder="Ex: 75" min="1" max="300" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 12px;color:var(--t1);font-family:'Inter',sans-serif;font-size:14px;margin-top:6px;outline:none">
         </div>
+      </div>
+    </div>
+    <!-- Exames em destaque -->
+    <div style="background:var(--card);border-radius:18px;padding:20px;border:1px solid rgba(255,255,255,.04);margin:12px 16px 0">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div>
+          <div style="font-size:16px;font-weight:700">Exames em destaque</div>
+          <div style="font-size:12px;color:var(--t2);margin-top:3px">Aparecem no anel da tela inicial</div>
+        </div>
+        <button onclick="saveFeatured()" style="background:linear-gradient(135deg,#2563EB,#06B6D4);border:none;color:#fff;border-radius:8px;padding:8px 16px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer">Salvar</button>
+      </div>
+      <div id="featured-list"></div>
+    </div>
+    <!-- Sair da conta -->
+    <div style="background:var(--card);border-radius:18px;padding:20px;border:1px solid rgba(255,255,255,.04);margin:12px 16px 24px;cursor:pointer" onclick="doLogout()">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:40px;height:40px;border-radius:10px;background:rgba(239,68,68,.12);display:flex;align-items:center;justify-content:center">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2" stroke-linecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </div>
+        <div style="font-size:15px;font-weight:600;color:#EF4444">Sair da conta</div>
       </div>
     </div>
   </div>
@@ -1151,48 +1193,84 @@ const DEFAULT_FEATURED = [
   {label:'Colesterol',         search:'colesterol total'},
 ];
 
-let featuredList = [...DEFAULT_FEATURED];
+let featuredList = [];
 let carIdx = 0;
 let carTimer = null;
-let carItems = []; // filtered items that have data
+let carItems = [];
 
 function loadFeatured() {
   if(!window.fbLoad) return;
-  // Load from Firebase
   db.ref(`users/${currentUID}/featured`).get().then(snap => {
-    if(snap.exists()) featuredList = snap.val();
+    if(snap.exists()) featuredList = snap.val().filter(f=>f&&f.search);
+    else featuredList = [];
     rFeaturedList();
     startCarousel();
-  }).catch(()=>{ rFeaturedList(); startCarousel(); });
+  }).catch(()=>{ featuredList=[]; rFeaturedList(); startCarousel(); });
 }
 
 window.saveFeatured = async () => {
   try {
     await db.ref(`users/${currentUID}/featured`).set(featuredList);
     startCarousel();
-    // Show saved feedback
     const btn = event.target;
     btn.textContent = '✓ Salvo!';
     setTimeout(()=>btn.textContent='Salvar', 1500);
   } catch(e) { console.error(e); }
 };
 
+function getAvailableExams() {
+  // All unique exam names extracted from imported PDFs
+  return [...new Set(window.exams.flatMap(e=>(e.results||[]).map(r=>r.name)))].sort();
+}
+
 function rFeaturedList() {
   const container = document.getElementById('featured-list');
   if(!container) return;
-  // Get all unique exam names from imported exams
-  const availableExams = [...new Set(window.exams.flatMap(e=>(e.results||[]).map(r=>r.name)))].sort();
-  container.innerHTML = featuredList.map((item,i) => `
+  const allExams = getAvailableExams();
+
+  // Ensure featuredList has no more slots than needed
+  // Show slots: all filled + 1 empty (if < 10)
+  const filled = featuredList.filter(f=>f&&f.search);
+  const slots = filled.length < 10 ? [...filled, {label:'',search:''}] : [...filled];
+
+  container.innerHTML = slots.map((item, i) => {
+    // Already selected in other slots
+    const takenSearches = slots.map((s,j)=>j!==i&&s&&s.search?s.search.toLowerCase():null).filter(Boolean);
+    const options = allExams.filter(n => !takenSearches.includes(n.toLowerCase()));
+    return `
     <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)">
       <div style="width:24px;height:24px;border-radius:6px;background:rgba(37,99,235,.2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--cyan);flex-shrink:0">${i+1}</div>
-      <select onchange="featuredList[${i}]={label:this.options[this.selectedIndex].text,search:this.value}"
+      <select onchange="onFeaturedChange(${i},this)"
         style="flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:8px 10px;color:var(--t1);font-family:'Inter',sans-serif;font-size:13px;outline:none">
-        <option value="" ${!item.search?'selected':''}>— Nenhum —</option>
-        ${DEFAULT_FEATURED.map(d=>`<option value="${d.search}" ${item.search===d.search?'selected':''}>${d.label}</option>`).join('')}
-        ${availableExams.filter(n=>!DEFAULT_FEATURED.some(d=>n.toLowerCase().includes(d.search))).map(n=>`<option value="${n.toLowerCase()}" ${item.search===n.toLowerCase()?'selected':''}>${n}</option>`).join('')}
+        <option value="">— Selecione um exame —</option>
+        ${options.map(n=>`<option value="${n.toLowerCase()}" ${item.search&&item.search.toLowerCase()===n.toLowerCase()?'selected':''}>${n}</option>`).join('')}
       </select>
-    </div>`).join('');
+      ${item.search?`<button onclick="removeFeatured(${i})" style="background:rgba(239,68,68,.15);border:none;border-radius:8px;padding:8px;cursor:pointer;color:#EF4444;flex-shrink:0">✕</button>`:''}
+    </div>`;
+  }).join('');
+
+  if(!allExams.length){
+    container.innerHTML='<div style="font-size:13px;color:var(--t3);text-align:center;padding:16px 0">Importe laudos para selecionar exames.</div>';
+  }
 }
+
+window.onFeaturedChange = (i, sel) => {
+  const val = sel.value;
+  const label = val ? sel.options[sel.selectedIndex].text : '';
+  if(val) {
+    featuredList[i] = {label, search:val};
+  } else {
+    featuredList.splice(i, 1);
+  }
+  featuredList = featuredList.filter(f=>f&&f.search);
+  rFeaturedList();
+};
+
+window.removeFeatured = (i) => {
+  featuredList.splice(i, 1);
+  featuredList = featuredList.filter(f=>f&&f.search);
+  rFeaturedList();
+};
 
 function getLatestValue(searchTerm) {
   if(!searchTerm) return null;
