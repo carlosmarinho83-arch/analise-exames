@@ -25,7 +25,7 @@ const auth = firebase.auth();
 
 let currentUID = null;
 let currentUserName = 'Usuário';
-let currentProfile = {name:'', sex:'', age:'', weight:''};
+let currentProfile = {name:'', sex:'', birthdate:'', age:'', weight:'', height:'', cpf:''};
 
 // ── FIREBASE DATA ──────────────────────────────────────────────────────────
 function userRef() { return `users/${currentUID}/exames`; }
@@ -50,7 +50,7 @@ auth.onAuthStateChanged(async user => {
       if(snap.exists()){
         const p=snap.val();
         currentUserName = p.name || user.email.split('@')[0];
-        currentProfile = {name:p.name||'',sex:p.sex||'',age:p.age||'',weight:p.weight||''};
+        currentProfile = {name:p.name||'',sex:p.sex||'',birthdate:p.birthdate||'',age:p.age||'',weight:p.weight||'',height:p.height||'',cpf:p.cpf||''};
       } else {
         currentUserName = user.email.split('@')[0];
       }
@@ -106,12 +106,13 @@ window.doRegister = async () => {
 
 function checkProfileComplete(){
   const p=currentProfile;
-  if(!p.name||!p.sex||!p.age||!p.weight){
+  if(!p.name||!p.sex||!p.birthdate||!p.weight||!p.height){
     const missing=[];
     if(!p.name)missing.push('Nome completo');
     if(!p.sex)missing.push('Sexo');
-    if(!p.age)missing.push('Idade');
+    if(!p.birthdate)missing.push('Data de nascimento');
     if(!p.weight)missing.push('Peso');
+    if(!p.height)missing.push('Altura');
     const list=document.getElementById('pm-missing-list');
     if(list)list.innerHTML=missing.map(m=>`<div class="pm-missing-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>${m}</div>`).join('');
     const modal=document.getElementById('profile-modal');
@@ -131,15 +132,27 @@ function openImport(){
   openImport();
 }
 
+function formatCPF(input){
+  let v=input.value.replace(/\D/g,'').slice(0,11);
+  if(v.length>9)v=v.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/,'$1.$2.$3-$4');
+  else if(v.length>6)v=v.replace(/(\d{3})(\d{3})(\d{0,3})/,'$1.$2.$3');
+  else if(v.length>3)v=v.replace(/(\d{3})(\d{0,3})/,'$1.$2');
+  input.value=v;
+}
+
 window.saveProfile = async () => {
   const name = document.getElementById('pf-name').value.trim();
   const sex  = document.getElementById('pf-sex').value;
-  const age  = document.getElementById('pf-age').value;
+  const birthdate = document.getElementById('pf-birthdate').value;
   const weight = document.getElementById('pf-weight').value;
+  const height = document.getElementById('pf-height').value;
+  const cpf = document.getElementById('pf-cpf').value.trim();
   if(!name){alert('Digite seu nome completo.');return;}
+  if(!birthdate){alert('Informe sua data de nascimento.');return;}
+  const age = birthdate ? calcAge(birthdate) : null;
   try{
-    await db.ref(`users/${currentUID}/profile`).set({name,sex,age:age?Number(age):null,weight:weight?Number(weight):null,email:firebase.auth().currentUser.email});
-    currentProfile={name,sex,age:age?Number(age):'',weight:weight?Number(weight):''};
+    await db.ref(`users/${currentUID}/profile`).set({name,sex,birthdate,age,weight:weight?Number(weight):null,height:height?Number(height):null,cpf,email:firebase.auth().currentUser.email});
+    currentProfile={name,sex,birthdate,age,weight:weight?Number(weight):'',height:height?Number(height):'',cpf};
     currentUserName=name;
     const first=name.split(' ')[0];
     const greetEl=document.getElementById('greet-name');if(greetEl)greetEl.textContent=`Olá, ${first} 👋`;
@@ -150,11 +163,31 @@ window.saveProfile = async () => {
   }catch(e){alert('Erro ao salvar: '+e.message);}
 };
 
+function calcAge(birthdate){
+  if(!birthdate)return null;
+  const today=new Date();const bd=new Date(birthdate);
+  let age=today.getFullYear()-bd.getFullYear();
+  const m=today.getMonth()-bd.getMonth();
+  if(m<0||(m===0&&today.getDate()<bd.getDate()))age--;
+  return age;
+}
+
 function populateProfileForm(){
   const n=document.getElementById('pf-name');if(n)n.value=currentProfile.name||'';
   const s=document.getElementById('pf-sex');if(s)s.value=currentProfile.sex||'';
-  const a=document.getElementById('pf-age');if(a)a.value=currentProfile.age||'';
+  const b=document.getElementById('pf-birthdate');if(b)b.value=currentProfile.birthdate||'';
   const w=document.getElementById('pf-weight');if(w)w.value=currentProfile.weight||'';
+  const h=document.getElementById('pf-height');if(h)h.value=currentProfile.height||'';
+  const c=document.getElementById('pf-cpf');if(c)c.value=currentProfile.cpf||'';
+  updateAgeDisplay();
+}
+
+function updateAgeDisplay(){
+  const b=document.getElementById('pf-birthdate');
+  const disp=document.getElementById('pf-age-display');
+  if(!b||!disp)return;
+  const age=calcAge(b.value);
+  disp.textContent=age!=null?age+' anos':'';
 }
 
 window.doLogout = async () => {
@@ -405,6 +438,18 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
 .lt{color:var(--cyan);font-size:14px;font-weight:600}
 .ls{color:var(--t2);font-size:12px;margin-top:2px}
 #error-msg{display:none;position:fixed;bottom:calc(var(--nav-h) + 10px);left:10px;right:10px;max-width:410px;margin:0 auto;z-index:200;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.25);border-radius:12px;padding:12px 16px;color:var(--red);font-size:13px}
+/* CONFIRM DELETE MODAL */
+#confirm-modal{display:none;position:fixed;inset:0;z-index:300;align-items:center;justify-content:center;padding:24px}
+#confirm-modal.open{display:flex}
+.cm-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px)}
+.cm-box{position:relative;background:linear-gradient(160deg,#0C1E3D,#0F2847);border:1px solid rgba(239,68,68,.2);border-radius:24px;padding:28px 24px;width:100%;max-width:360px;z-index:1;animation:pmIn .2s ease}
+.cm-icon{width:56px;height:56px;border-radius:16px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.2);display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+.cm-title{font-size:18px;font-weight:700;text-align:center;margin-bottom:8px}
+.cm-desc{font-size:13px;color:var(--t2);text-align:center;line-height:1.6}
+.cm-actions{display:flex;gap:10px;margin-top:24px}
+.cm-btn-cancel{flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:12px;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;color:var(--t2);cursor:pointer}
+.cm-btn-delete{flex:1;background:linear-gradient(135deg,#EF4444,#DC2626);border:none;border-radius:12px;padding:12px;font-family:'Inter',sans-serif;font-size:14px;font-weight:700;color:#fff;cursor:pointer}
+
 /* PROFILE REQUIRED MODAL */
 #profile-modal{display:none;position:fixed;inset:0;z-index:300;align-items:center;justify-content:center;padding:24px}
 #profile-modal.open{display:flex}
@@ -512,6 +557,22 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
 <!-- LOADING -->
 <div id="loading"><div class="spinner"></div><div><div class="lt">Analisando laudo com IA…</div><div class="ls" id="lfn"></div></div></div>
 <div id="error-msg"></div>
+
+<!-- CONFIRM DELETE MODAL -->
+<div id="confirm-modal">
+  <div class="cm-backdrop" onclick="closeConfirmModal()"></div>
+  <div class="cm-box">
+    <div class="cm-icon">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+    </div>
+    <div class="cm-title">Apagar laudo?</div>
+    <div class="cm-desc">Esta ação não pode ser desfeita. O laudo e todos os seus dados serão removidos permanentemente.</div>
+    <div class="cm-actions">
+      <button class="cm-btn-cancel" onclick="closeConfirmModal()">Cancelar</button>
+      <button class="cm-btn-delete" onclick="confirmDelete()">Apagar</button>
+    </div>
+  </div>
+</div>
 
 <!-- PROFILE REQUIRED MODAL -->
 <div id="profile-modal">
@@ -707,13 +768,22 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
             </select>
           </div>
           <div style="flex:1">
-            <label style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">Idade</label>
-            <input id="pf-age" type="number" placeholder="Anos" min="1" max="120" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 12px;color:var(--t1);font-family:'Inter',sans-serif;font-size:14px;margin-top:6px;outline:none">
+            <label style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">Peso (kg)</label>
+            <input id="pf-weight" type="number" placeholder="Ex: 75" min="1" max="300" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 12px;color:var(--t1);font-family:'Inter',sans-serif;font-size:14px;margin-top:6px;outline:none">
+          </div>
+          <div style="flex:1">
+            <label style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">Altura (cm)</label>
+            <input id="pf-height" type="number" placeholder="Ex: 175" min="50" max="250" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 12px;color:var(--t1);font-family:'Inter',sans-serif;font-size:14px;margin-top:6px;outline:none">
           </div>
         </div>
         <div>
-          <label style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">Peso (kg)</label>
-          <input id="pf-weight" type="number" placeholder="Ex: 75" min="1" max="300" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 12px;color:var(--t1);font-family:'Inter',sans-serif;font-size:14px;margin-top:6px;outline:none">
+          <label style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">Data de nascimento</label>
+          <input id="pf-birthdate" type="date" onchange="updateAgeDisplay()" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 12px;color:var(--t1);font-family:'Inter',sans-serif;font-size:14px;margin-top:6px;outline:none">
+          <div id="pf-age-display" style="font-size:12px;color:var(--cyan);margin-top:5px;font-weight:600;min-height:18px"></div>
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">CPF <span style="color:var(--t3);font-weight:400;text-transform:none">(opcional)</span></label>
+          <input id="pf-cpf" type="text" placeholder="000.000.000-00" maxlength="14" oninput="formatCPF(this)" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 12px;color:var(--t1);font-family:'Inter',sans-serif;font-size:14px;margin-top:6px;outline:none">
         </div>
       </div>
     </div>
@@ -888,7 +958,7 @@ REGRAS OBRIGATÓRIAS:
             ctx=' Dados do paciente para contextualizar as referências:';
             if(p.sex)ctx+=' Sexo: '+p.sex+'.';if(p.age)ctx+=' Faixa etária: '+ageGroup+'.';
             if(p.age)ctx+=' Idade: '+p.age+' anos.';
-            if(p.weight)ctx+=' Peso: '+p.weight+'kg.';
+            if(p.weight)ctx+=' Peso: '+p.weight+'kg.';if(p.height)ctx+=' Altura: '+p.height+'cm.';
             ctx+=' Use esses dados para validar se os valores de referência do laudo são adequados para este perfil.';
           }
           return 'Extraia todos os dados deste laudo ('+fn+'). Preste especial atenção aos valores de referência — eles costumam aparecer após o resultado na forma de intervalos (ex: 10,0 - 40,0) ou como VR/Referência. Retorne o JSON conforme instruído.'+ctx;
@@ -1036,7 +1106,7 @@ function rExames(){
         <div class="report-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="1.8" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
         <div class="report-info"><div class="report-lab">${exam.lab||'Laboratório'}</div><div class="report-meta">${fd(exam.date)} · ${(exam.results||[]).length} exames</div></div>
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-          <button class="btn-rm" onclick="event.stopPropagation();rm('${exam.id}')">✕</button>
+          <button class="btn-rm" onclick="event.stopPropagation();askDelete('${exam.id}')">✕</button>
           <span class="chev">▾</span>
         </div>
       </div>
@@ -1154,6 +1224,26 @@ function rInsights(){
 
 /* UTILS */
 function tog(h){h.parentElement.classList.toggle('open');}
+let _pendingDeleteId = null;
+
+function askDelete(id){
+  _pendingDeleteId = id;
+  document.getElementById('confirm-modal').classList.add('open');
+}
+
+function closeConfirmModal(){
+  _pendingDeleteId = null;
+  document.getElementById('confirm-modal').classList.remove('open');
+}
+
+function confirmDelete(){
+  if(!_pendingDeleteId)return;
+  window.exams=window.exams.filter(e=>String(e.id)!==String(_pendingDeleteId));
+  if(window.fbRemove)window.fbRemove(_pendingDeleteId);
+  closeConfirmModal();
+  render();
+}
+
 function rm(id){
   window.exams=window.exams.filter(e=>String(e.id)!==String(id));
   if(window.fbRemove)window.fbRemove(id);
