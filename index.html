@@ -245,7 +245,7 @@ function closeAgenda(){
   const medOpen=document.getElementById('med-form').classList.contains('open');
   const cycleOpen=document.getElementById('cycle-form').classList.contains('open');
   // Form aberto com dados → confirmar descarte
-  if(medOpen&&formHasData(['mf-name','mf-dose','mf-brand','mf-qty-num'])){
+  if(medOpen&&formHasData(['mf-name','mf-dose','mf-brand'])){
     chConfirm('Medicamento não salvo','Você começou a cadastrar um medicamento. Deseja descartar e fechar?',()=>{
       closeMedForm();document.getElementById('agenda-modal').classList.remove('open');
     });return;
@@ -266,7 +266,7 @@ function formHasData(fields){return fields.some(id=>{const el=document.getElemen
 function agTab(tab){
   const medOpen=document.getElementById('med-form').classList.contains('open');
   const cycleOpen=document.getElementById('cycle-form').classList.contains('open');
-  if(medOpen&&formHasData(['mf-name','mf-dose','mf-brand','mf-qty-num'])){
+  if(medOpen&&formHasData(['mf-name','mf-dose','mf-brand'])){
     chConfirm('Medicamento não salvo','Você começou a cadastrar um medicamento. Deseja descartar e continuar?',()=>{
       closeMedForm();doAgTab(tab);
     });return;
@@ -305,6 +305,51 @@ async function loadAgendaData(){
 
 /* ── MEDICAMENTOS ── */
 let _editMedId=null;
+
+const TIMES=['Café da manhã','Almoço','Jantar','Antes de dormir','Outro horário'];
+const UNITS=['','cápsula','comprimido','sachê','gota','ml'];
+
+function scheduleRowHTML(idx, time='', qtyNum='', qtyUnit=''){
+  return`<div class="mf-sched-row" id="sched-${idx}" style="display:flex;gap:6px;align-items:center;margin-bottom:7px">
+    <select class="ag-select" id="sched-time-${idx}" style="flex:1.2">
+      ${TIMES.map(t=>`<option value="${t}" ${t===time?'selected':''}>${t}</option>`).join('')}
+    </select>
+    <input class="ag-input" id="sched-qty-${idx}" type="number" min="0.5" step="0.5" placeholder="Qtd" value="${qtyNum}" style="width:52px;flex-shrink:0;text-align:center">
+    <select class="ag-select" id="sched-unit-${idx}" style="flex:1">
+      ${UNITS.map(u=>`<option value="${u}" ${u===qtyUnit?'selected':''}>${u||'Unidade'}</option>`).join('')}
+    </select>
+    <button onclick="removeScheduleRow(${idx})" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:8px;width:30px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--red);flex-shrink:0;font-size:14px">✕</button>
+  </div>`;
+}
+
+let _schedIdx=0;
+
+function addScheduleRow(time='', qtyNum='', qtyUnit=''){
+  const container=document.getElementById('mf-schedules');
+  if(!container)return;
+  const idx=_schedIdx++;
+  container.insertAdjacentHTML('beforeend', scheduleRowHTML(idx, time, qtyNum, qtyUnit));
+}
+
+function removeScheduleRow(idx){
+  const el=document.getElementById('sched-'+idx);
+  if(el)el.remove();
+  // Ensure at least one row
+  const container=document.getElementById('mf-schedules');
+  if(container&&!container.querySelector('.mf-sched-row'))addScheduleRow();
+}
+
+function getSchedules(){
+  const rows=document.querySelectorAll('.mf-sched-row');
+  return [...rows].map(row=>{
+    const idx=row.id.replace('sched-','');
+    const time=document.getElementById('sched-time-'+idx)?.value||'';
+    const qtyNum=document.getElementById('sched-qty-'+idx)?.value||'';
+    const qtyUnit=document.getElementById('sched-unit-'+idx)?.value||'';
+    const qty=qtyNum&&qtyUnit?qtyNum+' '+qtyUnit+(Number(qtyNum)>1&&qtyUnit!=='ml'?'s':''):qtyNum||qtyUnit||'';
+    return{time,qty};
+  }).filter(s=>s.time);
+}
 
 function setQty(v){document.getElementById('mf-qty').value=v;}
 
@@ -354,10 +399,10 @@ async function saveMed(){
   const days=freq==='semanal'?[...document.querySelectorAll('#med-form .ag-day.sel')].map(d=>Number(d.dataset.d)):[];
   if(freq==='semanal'&&!days.length){chAlert('error','Selecione os dias','Escolha ao menos um dia da semana.');return;}
   const id=_editMedId||Date.now()+'_med';
-  const qtyNum=document.getElementById('mf-qty-num').value;
-  const qtyUnit=document.getElementById('mf-qty-unit').value;
-  const qty=qtyNum&&qtyUnit?qtyNum+' '+qtyUnit+(qtyNum>1&&qtyUnit!=='ml'?'s':''):(qtyNum||qtyUnit||'');
-  const med={id,name,dose,brand:document.getElementById('mf-brand').value.trim(),freq,days,time:document.getElementById('mf-time').value,qty};
+  const schedules=getSchedules();
+  if(!schedules.length){chAlert('error','Horário obrigatório','Adicione pelo menos um horário.');return;}
+  const formula=document.getElementById('mf-formula').value.trim();
+  const med={id,name,dose,brand:document.getElementById('mf-brand').value.trim(),freq,days,schedules,formula};
   if(_editMedId){agendaMeds=agendaMeds.map(m=>m.id===id?med:m);}
   else{agendaMeds.push(med);}
   await db.ref(`users/${currentUID}/agenda/meds/${id}`).set(med);
@@ -398,7 +443,7 @@ function renderMeds(){
       </div>
       <div class="ag-item-rows">
         <div class="ag-item-row"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>${freqTxt}</div>
-        <div class="ag-item-row"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${m.time}${m.qty?' · '+m.qty:''}</div>
+        ${(m.schedules||[{time:m.time||'',qty:m.qty||''}]).map(s=>`<div class="ag-item-row"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${s.time}${s.qty?' · '+s.qty:''}</div>`).join('')}
       </div>
     </div>`;
   }).join('');
@@ -1396,31 +1441,16 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
               <div class="ag-day" data-d="6" onclick="toggleDay(this)">Sáb</div>
             </div>
           </div>
-          <div style="display:flex;gap:10px">
-            <div class="ag-field" style="flex:1">
-              <div class="ag-label">Horário</div>
-              <select class="ag-select" id="mf-time">
-                <option value="Café da manhã">Café da manhã</option>
-                <option value="Almoço">Almoço</option>
-                <option value="Jantar">Jantar</option>
-                <option value="Antes de dormir">Antes de dormir</option>
-                <option value="Outro">Outro horário</option>
-              </select>
+          <div class="ag-field">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+              <div class="ag-label" style="margin-bottom:0">Horários</div>
+              <button onclick="addScheduleRow()" style="background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.2);border-radius:7px;padding:4px 10px;font-family:'Inter',sans-serif;font-size:11px;font-weight:600;color:var(--cyan);cursor:pointer">+ horário</button>
             </div>
-            <div class="ag-field" style="flex:1">
-              <div class="ag-label">Quantidade</div>
-              <div style="display:flex;gap:6px">
-                <input class="ag-input" id="mf-qty-num" type="number" min="0.5" step="0.5" placeholder="Ex: 2" style="width:60px;flex-shrink:0">
-                <select class="ag-select" id="mf-qty-unit" style="flex:1">
-                  <option value="">Unidade</option>
-                  <option value="cápsula">Cápsula</option>
-                  <option value="comprimido">Comprimido</option>
-                  <option value="sachê">Sachê</option>
-                  <option value="gota">Gota</option>
-                  <option value="ml">ml</option>
-                </select>
-              </div>
-            </div>
+            <div id="mf-schedules"></div>
+          </div>
+          <div class="ag-field">
+            <div class="ag-label">Fórmula <span style="color:var(--t3);font-weight:400;text-transform:none;letter-spacing:0">(medicamento manipulado)</span></div>
+            <textarea id="mf-formula" placeholder="Ex: Vitamina D3 10.000UI + Vitamina K2 100mcg + Zinco 30mg..." style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 12px;color:var(--t1);font-family:'Inter',sans-serif;font-size:13px;outline:none;resize:none;min-height:72px;line-height:1.5"></textarea>
           </div>
           <div class="ag-form-btns">
             <button class="ag-form-cancel" onclick="closeMedForm()">Cancelar</button>
