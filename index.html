@@ -418,19 +418,30 @@ function openCycleDatePicker(){
   document.getElementById('date-picker-modal').classList.add('open');
 }
 
-function openCycleForm(){
+let _editCycleId=null;
+
+function openCycleForm(cycle=null){
+  _editCycleId=cycle?cycle.id:null;
   document.getElementById('cycle-form').classList.add('open');
   document.getElementById('cycle-add-btn').style.display='none';
-  document.getElementById('cf-name').value='';
-  document.getElementById('cf-interval').value='';
-  document.getElementById('cf-lastdate').value='';
-  const cft=document.getElementById('cf-lastdate-text');if(cft){cft.textContent='Selecionar data';cft.style.color='var(--t3)';}
-  document.getElementById('cf-type').value='interval';
-  document.getElementById('cf-peakvalley').checked=true;
-  document.getElementById('cf-peak-days').value='2';
-  document.getElementById('cf-vale-days').value='';
-  document.getElementById('cf-pv-config').style.display='block';
-  document.querySelectorAll('#cf-days .ag-day').forEach(d=>d.classList.remove('sel'));
+  document.getElementById('cf-name').value=cycle?cycle.name:'';
+  document.getElementById('cf-interval').value=cycle?cycle.interval:'';
+  document.getElementById('cf-lastdate').value=cycle?cycle.lastdate:'';
+  const cft=document.getElementById('cf-lastdate-text');
+  if(cft){
+    if(cycle&&cycle.lastdate){
+      const[y,m,d]=cycle.lastdate.split('-');
+      cft.textContent=`${d}/${m}/${y}`;cft.style.color='var(--t1)';
+    } else {cft.textContent='Selecionar data';cft.style.color='var(--t3)';}
+  }
+  document.getElementById('cf-type').value=cycle?cycle.type:'interval';
+  document.getElementById('cf-peakvalley').checked=cycle?cycle.peakvalley:true;
+  document.getElementById('cf-peak-days').value=cycle?cycle.peakDays||2:2;
+  document.getElementById('cf-vale-days').value=cycle?cycle.valeDays||'':'';
+  document.getElementById('cf-pv-config').style.display=(cycle?cycle.peakvalley:true)?'block':'none';
+  document.querySelectorAll('#cf-days .ag-day').forEach(d=>{
+    d.classList.toggle('sel',cycle&&cycle.days&&cycle.days.includes(Number(d.dataset.d)));
+  });
   toggleCycleType();
 }
 function closeCycleForm(){
@@ -451,11 +462,13 @@ async function saveCycle(){
   const peakvalley=document.getElementById('cf-peakvalley').checked;
   const peakDays=peakvalley?parseInt(document.getElementById('cf-peak-days').value)||2:0;
   const valeDays=peakvalley?parseInt(document.getElementById('cf-vale-days').value)||0:0;
-  const cycle={id:Date.now()+'_cyc',name,type,interval,days,lastdate,peakvalley,peakDays,valeDays};
-  agendaCycles.push(cycle);
-  await db.ref(`users/${currentUID}/agenda/cycles/${cycle.id}`).set(cycle);
+  const id=_editCycleId||Date.now()+'_cyc';
+  const cycle={id,name,type,interval,days,lastdate,peakvalley,peakDays,valeDays};
+  if(_editCycleId){agendaCycles=agendaCycles.map(c=>c.id===id?cycle:c);}
+  else{agendaCycles.push(cycle);}
+  await db.ref(`users/${currentUID}/agenda/cycles/${id}`).set(cycle);
   closeCycleForm();renderCycles();renderNotifs();
-  chAlert('success','Aplicação salva!','Ciclo adicionado à sua agenda.');
+  chAlert('success',_editCycleId?'Aplicação atualizada!':'Aplicação salva!',_editCycleId?'Alterações salvas.':'Ciclo adicionado à sua agenda.');
 }
 
 async function deleteCycle(id){
@@ -487,7 +500,11 @@ function calcNextDates(cycle,count=4){
   return dates;
 }
 
-function fmtDate(d){return d.toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'});}
+function fmtDate(d){
+  const day=d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
+  const week=d.toLocaleDateString('pt-BR',{weekday:'short'}).replace('.','');
+  return`<span style="font-weight:600">${day}</span><span style="color:var(--t3);font-size:11px;margin-left:4px">${week}.</span>`;
+}
 function daysFromToday(d){const today=new Date();today.setHours(0,0,0,0);return Math.round((d-today)/86400000);}
 
 function renderCycles(){
@@ -512,6 +529,9 @@ function renderCycles(){
       <div class="ag-item-top">
         <div><div class="ag-item-name">${c.name}</div><div class="ag-item-dose">${freqTxt}</div></div>
         <div class="ag-item-actions">
+          <div class="ag-item-edit" onclick="openCycleForm(${JSON.stringify(c).replace(/"/g,'&quot;')})">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </div>
           <div class="ag-item-del" onclick="confirmDeleteCycle('${c.id}')">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
           </div>
