@@ -745,8 +745,8 @@ async function claude(b64,fn){
   const res=await fetch('https://chronia-proxy.carlosmarinho83.workers.dev',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:4000,
-      system:'Você é especialista em laudos médicos. Retorne APENAS JSON válido sem markdown: {"date":"YYYY-MM-DD ou null","lab":"laboratório","patient":"nome ou null","results":[{"name":"exame","value":numero,"unit":"unidade","refMin":numero_ou_null,"refMax":numero_ou_null,"status":"normal|alto|baixo|indeterminado"}]}',
+    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:8000,
+      system:'Você é especialista em laudos médicos. Retorne APENAS JSON válido sem markdown, sem texto extra: {"date":"YYYY-MM-DD ou null","lab":"laboratório","patient":"nome ou null","results":[{"name":"exame","value":numero,"unit":"unidade","refMin":numero_ou_null,"refMax":numero_ou_null,"status":"normal|alto|baixo|indeterminado"}]}. Inclua TODOS os exames do laudo.',
       messages:[{role:'user',content:[
         {type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},
         {type:'text',text:'Analise este laudo ('+fn+') e retorne JSON.'}
@@ -755,7 +755,18 @@ async function claude(b64,fn){
   });
   if(!res.ok)throw new Error('API erro '+res.status);
   const d=await res.json();
-  return JSON.parse((d.content||[]).map(b=>b.text||'').join('').replace(/```json|```/g,'').trim());
+  let txt=(d.content||[]).map(b=>b.text||'').join('').replace(/```json|```/g,'').trim();
+  // Fix incomplete JSON by finding last complete object
+  if(!txt.endsWith('}')) {
+    const lastBrace=txt.lastIndexOf('}');
+    if(lastBrace>0) txt=txt.substring(0,lastBrace+1);
+    // Close arrays/objects if needed
+    const opens=(txt.match(/\[/g)||[]).length-(txt.match(/\]/g)||[]).length;
+    for(let i=0;i<opens;i++) txt+=']';
+    const openb=(txt.match(/\{/g)||[]).length-(txt.match(/\}/g)||[]).length;
+    for(let i=0;i<openb;i++) txt+='}';
+  }
+  return JSON.parse(txt);
 }
 
 /* ── RENDER ── */
