@@ -2432,9 +2432,20 @@ function rCharts(){
       }]},
       options:{responsive:true,maintainAspectRatio:false,
         plugins:{legend:{display:false},tooltip:{backgroundColor:'#0F172A',borderColor:'#334155',borderWidth:1,titleColor:'#64748B',bodyColor:col,bodyFont:{weight:'700',size:15,family:'Inter'},callbacks:{label:c=>fv(c.raw)+(unit?' '+unit:'')}}},
-        scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#64748B',font:{size:11,weight:'500',family:'Inter'},maxRotation:0}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#64748B',font:{size:11,family:'Inter'}},afterFit(scale){const maxLen=Math.max(...scale.ticks.map(t=>(t.label||'').toString().length));scale.width=Math.max(36,Math.min(60,maxLen*8));},suggestedMin:refMin!=null?refMin*0.9:undefined,suggestedMax:refMax!=null?refMax*1.1:undefined}}
+        scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{display:false},border:{display:false}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#64748B',font:{size:11,family:'Inter'}},afterFit(scale){const maxLen=Math.max(...scale.ticks.map(t=>(t.label||'').toString().length));scale.width=Math.max(36,Math.min(60,maxLen*8));},suggestedMin:refMin!=null?refMin*0.9:undefined,suggestedMax:refMax!=null?refMax*1.1:undefined}}
       },
-      plugins:[{id:'refs',afterDraw(chart){
+      plugins:[{id:'datelabel',afterDraw(chart){
+        const{ctx:c,scales:{x,y},chartArea}=chart;
+        if(!sorted.length)return;
+        const lastLabel=sorted[sorted.length-1]?fd(sorted[sorted.length-1].date):'';
+        c.save();
+        c.font='11px Inter, sans-serif';
+        c.fillStyle='#64748B';
+        c.textAlign='right';
+        c.fillText(lastLabel,chartArea.right,chartArea.bottom+18);
+        c.restore();
+      }},
+      {id:'refs',afterDraw(chart){
         if(refMin==null&&refMax==null)return;
         // Draw single ref line even if only one side exists
         const{ctx:c,scales:{x,y}}=chart;c.save();
