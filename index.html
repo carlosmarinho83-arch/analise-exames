@@ -484,7 +484,7 @@ function renderMeds(){
           <div class="ag-item-dose">${m.dose||''}</div>
         </div>
         <div class="ag-item-actions">
-          <div class="ag-item-edit" onclick="openMedForm(${JSON.stringify(m).replace(/"/g,'&quot;')},'${m.id}')">
+          <div class="ag-item-edit" onclick="openMedForm(agendaMeds.find(x=>x.id==='${m.id}'),'${m.id}')">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </div>
           <div class="ag-item-del" onclick="confirmDeleteMed('${m.id}')">
@@ -651,7 +651,7 @@ function renderCycles(){
           <div class="ag-item-dose">${freqTxt}${c.volMl&&c.ampMg&&c.ampMl?` · ${c.volMl}ml (${((c.ampMg/c.ampMl)*c.volMl)%1===0?((c.ampMg/c.ampMl)*c.volMl):((c.ampMg/c.ampMl)*c.volMl).toFixed(1).replace('.',',')}mg)`:''}</div>
         </div>
         <div class="ag-item-actions">
-          <div class="ag-item-edit" onclick="openCycleForm(${JSON.stringify(c).replace(/"/g,'&quot;')})">
+          <div class="ag-item-edit" onclick="openCycleForm(agendaCycles.find(x=>x.id==='${c.id}'))">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </div>
           <div class="ag-item-del" onclick="confirmDeleteCycle('${c.id}')">
