@@ -180,6 +180,14 @@ function confirmDatePicker(){
   const m=String(_dpMonth).padStart(2,'0');
   const d=String(_dpDay).padStart(2,'0');
   const val=`${y}-${m}-${d}`;
+  if(_cycleDateTarget==='cycle'){
+    document.getElementById('cf-lastdate').value=val;
+    const ct=document.getElementById('cf-lastdate-text');
+    if(ct){ct.textContent=`${d}/${m}/${y}`;ct.style.color='var(--t1)';}
+    _cycleDateTarget=null;
+    closeDatePicker();
+    return;
+  }
   document.getElementById('pf-birthdate').value=val;
   document.getElementById('pf-birthdate-text').textContent=`${d}/${m}/${y}`;
   document.getElementById('pf-birthdate-text').style.color='var(--t1)';
@@ -392,14 +400,29 @@ function renderMeds(){
 function confirmDeleteMed(id){chConfirm('Remover medicamento?','Este item será removido da sua agenda.',()=>deleteMed(id));}
 
 /* ── CICLOS ── */
+let _cycleDateTarget = null;
+
+function openCycleDatePicker(){
+  _cycleDateTarget = 'cycle';
+  const cur = document.getElementById('cf-lastdate').value;
+  if(cur){const[y,m,d]=cur.split('-');_dpYear=+y;_dpMonth=+m;_dpDay=+d;}
+  else{const t=new Date();_dpYear=t.getFullYear();_dpMonth=t.getMonth()+1;_dpDay=t.getDate();}
+  buildPicker();
+  document.getElementById('date-picker-modal').classList.add('open');
+}
+
 function openCycleForm(){
   document.getElementById('cycle-form').classList.add('open');
   document.getElementById('cycle-add-btn').style.display='none';
   document.getElementById('cf-name').value='';
   document.getElementById('cf-interval').value='';
   document.getElementById('cf-lastdate').value='';
+  const cft=document.getElementById('cf-lastdate-text');if(cft){cft.textContent='Selecionar data';cft.style.color='var(--t3)';}
   document.getElementById('cf-type').value='interval';
   document.getElementById('cf-peakvalley').checked=true;
+  document.getElementById('cf-peak-days').value='2';
+  document.getElementById('cf-vale-days').value='';
+  document.getElementById('cf-pv-config').style.display='block';
   document.querySelectorAll('#cf-days .ag-day').forEach(d=>d.classList.remove('sel'));
   toggleCycleType();
 }
@@ -418,7 +441,10 @@ async function saveCycle(){
   if(type==='weekdays'&&!days.length){chAlert('error','Selecione os dias','Escolha ao menos um dia da semana.');return;}
   const lastdate=document.getElementById('cf-lastdate').value;
   if(!lastdate){chAlert('error','Data obrigatória','Informe a data da última aplicação.');return;}
-  const cycle={id:Date.now()+'_cyc',name,type,interval,days,lastdate,peakvalley:document.getElementById('cf-peakvalley').checked};
+  const peakvalley=document.getElementById('cf-peakvalley').checked;
+  const peakDays=peakvalley?parseInt(document.getElementById('cf-peak-days').value)||2:0;
+  const valeDays=peakvalley?parseInt(document.getElementById('cf-vale-days').value)||0:0;
+  const cycle={id:Date.now()+'_cyc',name,type,interval,days,lastdate,peakvalley,peakDays,valeDays};
   agendaCycles.push(cycle);
   await db.ref(`users/${currentUID}/agenda/cycles/${cycle.id}`).set(cycle);
   closeCycleForm();renderCycles();renderNotifs();
@@ -465,8 +491,8 @@ function renderCycles(){
     const nextRows=nexts.map((d,i)=>{
       const diff=daysFromToday(d);
       const label=diff===0?'Hoje':diff===1?'Amanhã':`Em ${diff} dias`;
-      const pico=c.peakvalley?new Date(d.getTime()+2*86400000):null;
-      const vale=c.peakvalley&&c.type==='interval'?new Date(d.getTime()+(c.interval-1)*86400000):null;
+      const pico=c.peakvalley&&c.peakDays?new Date(d.getTime()+c.peakDays*86400000):null;
+      const vale=c.peakvalley&&c.valeDays?new Date(d.getTime()+c.valeDays*86400000):c.peakvalley&&c.type==='interval'?new Date(d.getTime()+(c.interval-1)*86400000):null;
       return`<div class="cycle-row">
         <span class="cycle-label">${fmtDate(d)}</span>
         <span class="cycle-val">${label}</span>
@@ -1381,13 +1407,31 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
               <div class="ag-day" data-d="6" onclick="toggleDay(this)">Sáb</div>
             </div>
           </div>
-          <div class="ag-field"><div class="ag-label">Data da última aplicação</div><input class="ag-input" id="cf-lastdate" type="date"></div>
+          <div class="ag-field">
+            <div class="ag-label">Data da última aplicação</div>
+            <div onclick="openCycleDatePicker()" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 12px;color:var(--t1);font-family:'Inter',sans-serif;font-size:13px;margin-top:0;cursor:pointer;display:flex;align-items:center;height:42px;box-sizing:border-box">
+              <span id="cf-lastdate-text" style="color:var(--t3)">Selecionar data</span>
+            </div>
+            <input id="cf-lastdate" type="hidden">
+          </div>
           <div class="ag-field" style="display:flex;align-items:center;justify-content:space-between">
             <div>
               <div class="ag-label" style="margin-bottom:0">Monitorar Pico e Vale</div>
-              <div style="font-size:11px;color:var(--t3);margin-top:2px">Pico 48h após · Vale no último dia</div>
+              <div style="font-size:11px;color:var(--t3);margin-top:2px">Configure os dias abaixo</div>
             </div>
-            <label class="ag-toggle"><input type="checkbox" id="cf-peakvalley" checked><span class="ag-toggle-slider"></span></label>
+            <label class="ag-toggle"><input type="checkbox" id="cf-peakvalley" checked onchange="document.getElementById('cf-pv-config').style.display=this.checked?'block':'none'"><span class="ag-toggle-slider"></span></label>
+          </div>
+          <div id="cf-pv-config" style="display:block">
+            <div style="display:flex;gap:10px">
+              <div class="ag-field" style="flex:1">
+                <div class="ag-label">Pico (dias após aplicação)</div>
+                <input class="ag-input" id="cf-peak-days" type="number" min="1" max="30" placeholder="Ex: 2" value="2">
+              </div>
+              <div class="ag-field" style="flex:1">
+                <div class="ag-label">Vale (dias após aplicação)</div>
+                <input class="ag-input" id="cf-vale-days" type="number" min="1" max="90" placeholder="Ex: 4">
+              </div>
+            </div>
           </div>
           <div class="ag-form-btns">
             <button class="ag-form-cancel" onclick="closeCycleForm()">Cancelar</button>
