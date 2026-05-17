@@ -790,17 +790,16 @@ function rHero(){
   const att=all.filter(r=>r.status==='alto'||r.status==='baixo'||r.status==='high'||r.status==='low'||r.status==='attention').length;
   const total=all.length;
   const pct=total?Math.round(((total-att)/total)*100):87;
-  document.getElementById('score-n').textContent=pct;
+  const scoreN=document.getElementById('score-n');if(scoreN)scoreN.textContent=pct;
   const offset=Math.round((1-pct/100)*232);
-  document.getElementById('score-circle').setAttribute('stroke-dashoffset',offset);
-  document.getElementById('hero-status').textContent=att===0?'Estável':att<=2?'Atenção':'Atenção';
-  document.getElementById('hero-desc').textContent=att===0?'Seus exames estão dentro da faixa ideal.':'Alguns exames precisam de atenção.';
+  const scoreC=document.getElementById('score-circle');if(scoreC)scoreC.setAttribute('stroke-dashoffset',offset);
+  const heroS=document.getElementById('hero-status');if(heroS)heroS.textContent=att===0?'Estável':att<=2?'Atenção':'Atenção';
+  const heroD=document.getElementById('hero-desc');if(heroD)heroD.textContent=att===0?'Seus exames estão dentro da faixa ideal.':'Alguns exames precisam de atenção.';
   const dates=window.exams.map(e=>e.date).filter(Boolean).sort();
-  // Fix timezone: parse date as local, not UTC
   function parseLocalDate(str){const[y,m,d]=str.split('-');return new Date(+y,+m-1,+d);}
-  document.getElementById('last-date').textContent=dates.length?parseLocalDate(dates[dates.length-1]).toLocaleDateString('pt-BR'):'—';
+  const lastD=document.getElementById('last-date');if(lastD)lastD.textContent=dates.length?parseLocalDate(dates[dates.length-1]).toLocaleDateString('pt-BR'):'—';
   const numCount=Object.keys(buildMap()).length;
-  document.getElementById('exam-count').textContent=numCount+' exames';
+  const examC=document.getElementById('exam-count');if(examC)examC.textContent=numCount+' exames';
 }
 
 /* EXAM ROWS */
