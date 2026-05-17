@@ -158,6 +158,38 @@ function chConfirm(title,msg,onConfirm){
   document.getElementById('ch-toast').classList.add('open');
   window._chToastCb=onConfirm||null;
 }
+function openFormulaBalloon(el, formula){
+  const balloon=document.getElementById('formula-balloon');
+  const txt=document.getElementById('formula-balloon-text');
+  if(!balloon||!txt)return;
+  txt.textContent=formula;
+  balloon.style.display='block';
+  // Position near clicked element
+  const rect=el.getBoundingClientRect();
+  const bw=balloon.offsetWidth||300;
+  let left=rect.left;
+  let top=rect.bottom+8;
+  // Keep within viewport
+  if(left+bw>window.innerWidth-16)left=window.innerWidth-bw-16;
+  if(left<16)left=16;
+  if(top+200>window.innerHeight)top=rect.top-210;
+  balloon.style.left=left+'px';
+  balloon.style.top=top+'px';
+  // Close on outside click
+  setTimeout(()=>document.addEventListener('click',outsideBaloonClick),10);
+}
+function outsideBaloonClick(e){
+  const balloon=document.getElementById('formula-balloon');
+  if(balloon&&!balloon.contains(e.target)){
+    closeFormulaBalloon();
+  }
+}
+function closeFormulaBalloon(){
+  const balloon=document.getElementById('formula-balloon');
+  if(balloon)balloon.style.display='none';
+  document.removeEventListener('click',outsideBaloonClick);
+}
+
 function closeChToast(run){
   document.getElementById('ch-toast').classList.remove('open');
   if(run&&window._chToastCb)window._chToastCb();
@@ -309,46 +341,48 @@ let _editMedId=null;
 const TIMES=['Café da manhã','Almoço','Jantar','Antes de dormir','Outro horário'];
 const UNITS=['','cápsula','comprimido','sachê','gota','ml'];
 
-function scheduleRowHTML(idx, time='', qtyNum='', qtyUnit=''){
-  return`<div class="mf-sched-row" id="sched-${idx}" style="display:flex;gap:6px;align-items:center;margin-bottom:7px">
-    <select class="ag-select" id="sched-time-${idx}" style="flex:1.2">
-      ${TIMES.map(t=>`<option value="${t}" ${t===time?'selected':''}>${t}</option>`).join('')}
-    </select>
-    <input class="ag-input" id="sched-qty-${idx}" type="number" min="0.5" step="0.5" placeholder="Qtd" value="${qtyNum}" style="width:52px;flex-shrink:0;text-align:center">
-    <select class="ag-select" id="sched-unit-${idx}" style="flex:1">
-      ${UNITS.map(u=>`<option value="${u}" ${u===qtyUnit?'selected':''}>${u||'Unidade'}</option>`).join('')}
-    </select>
-    <button onclick="removeScheduleRow(${idx})" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:8px;width:30px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--red);flex-shrink:0;font-size:14px">✕</button>
-  </div>`;
-}
+// Max 3 schedules, cascading — appears only after previous filled
+let _schedData=[{time:'',qtyNum:'',qtyUnit:''}];
 
-let _schedIdx=0;
-
-function addScheduleRow(time='', qtyNum='', qtyUnit=''){
+function rSchedules(){
   const container=document.getElementById('mf-schedules');
   if(!container)return;
-  const idx=_schedIdx++;
-  container.insertAdjacentHTML('beforeend', scheduleRowHTML(idx, time, qtyNum, qtyUnit));
+  // Show slots: all filled + 1 empty (if < 3)
+  const filled=_schedData.filter(s=>s.time);
+  const slots=filled.length<3?[...filled,{time:'',qtyNum:'',qtyUnit:''}]:[...filled];
+  container.innerHTML=slots.map((s,i)=>`
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:7px">
+      <div style="width:20px;height:20px;border-radius:5px;background:rgba(37,99,235,.15);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--cyan);flex-shrink:0">${i+1}</div>
+      <select class="ag-select" onchange="onSchedChange(${i},'time',this.value)" style="flex:1.3">
+        <option value="">— Horário —</option>
+        ${TIMES.map(t=>`<option value="${t}" ${s.time===t?'selected':''}>${t}</option>`).join('')}
+      </select>
+      <input class="ag-input" type="number" min="0.5" step="0.5" placeholder="Qtd" value="${s.qtyNum||''}" oninput="onSchedChange(${i},'qtyNum',this.value)" style="width:52px;flex-shrink:0;text-align:center">
+      <select class="ag-select" onchange="onSchedChange(${i},'qtyUnit',this.value)" style="flex:1">
+        ${UNITS.map(u=>`<option value="${u}" ${s.qtyUnit===u?'selected':''}>${u||'Unidade'}</option>`).join('')}
+      </select>
+      ${s.time?`<button onclick="removeSchedRow(${i})" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:8px;width:30px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--red);flex-shrink:0">✕</button>`:'<div style="width:30px;flex-shrink:0"></div>'}
+    </div>`).join('');
 }
 
-function removeScheduleRow(idx){
-  const el=document.getElementById('sched-'+idx);
-  if(el)el.remove();
-  // Ensure at least one row
-  const container=document.getElementById('mf-schedules');
-  if(container&&!container.querySelector('.mf-sched-row'))addScheduleRow();
+function onSchedChange(i,field,val){
+  // Expand array if needed
+  while(_schedData.length<=i)_schedData.push({time:'',qtyNum:'',qtyUnit:''});
+  _schedData[i][field]=val;
+  rSchedules();
+}
+
+function removeSchedRow(i){
+  _schedData.splice(i,1);
+  if(!_schedData.length)_schedData=[{time:'',qtyNum:'',qtyUnit:''}];
+  rSchedules();
 }
 
 function getSchedules(){
-  const rows=document.querySelectorAll('.mf-sched-row');
-  return [...rows].map(row=>{
-    const idx=row.id.replace('sched-','');
-    const time=document.getElementById('sched-time-'+idx)?.value||'';
-    const qtyNum=document.getElementById('sched-qty-'+idx)?.value||'';
-    const qtyUnit=document.getElementById('sched-unit-'+idx)?.value||'';
-    const qty=qtyNum&&qtyUnit?qtyNum+' '+qtyUnit+(Number(qtyNum)>1&&qtyUnit!=='ml'?'s':''):qtyNum||qtyUnit||'';
-    return{time,qty};
-  }).filter(s=>s.time);
+  return _schedData.filter(s=>s.time).map(s=>{
+    const qty=s.qtyNum&&s.qtyUnit?s.qtyNum+' '+s.qtyUnit+(Number(s.qtyNum)>1&&s.qtyUnit!=='ml'?'s':''):(s.qtyNum||s.qtyUnit||'');
+    return{time:s.time,qty};
+  });
 }
 
 function setQty(v){document.getElementById('mf-qty').value=v;}
@@ -444,7 +478,7 @@ function renderMeds(){
       <div class="ag-item-rows">
         <div class="ag-item-row"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>${freqTxt}</div>
         ${(m.schedules||[{time:m.time||'',qty:m.qty||''}]).map(s=>`<div class="ag-item-row"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${s.time}${s.qty?' · '+s.qty:''}</div>`).join('')}
-        ${m.formula?`<div class="ag-item-row" title="${m.formula}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18"/></svg><span style="color:var(--cyan);font-size:11px;font-weight:600">Fórmula manipulada</span></div>`:''}
+        ${m.formula&&m.formula.trim()?`<div class="ag-item-row" onclick="openFormulaBalloon(this,'${m.formula.replace(/'/g,"\'")}');event.stopPropagation()" style="margin-top:4px;padding-top:8px;border-top:1px solid rgba(255,255,255,.06);cursor:pointer"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18"/></svg><span style="color:var(--cyan);font-size:11px;font-weight:600">Fórmula manipulada</span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2.5" stroke-linecap="round" style="margin-left:auto;opacity:.6"><polyline points="6 9 12 15 18 9"/></svg></div>`:''}
       </div>
     </div>`;
   }).join('');
@@ -968,6 +1002,11 @@ body{font-family:'Inter',sans-serif;color:var(--t1);max-width:430px;margin:0 aut
 .ag-form-btns{display:flex;gap:8px;margin-top:12px}
 .ag-form-cancel{flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;color:var(--t2);cursor:pointer}
 .ag-form-save{flex:2;background:linear-gradient(135deg,#2563EB,#06B6D4);border:none;border-radius:10px;padding:10px;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;color:#fff;cursor:pointer}
+.formula-balloon{position:fixed;z-index:700;background:linear-gradient(160deg,#0C1E3D,#0F2847);border:1px solid rgba(6,182,212,.25);border-radius:14px;padding:14px 16px;max-width:300px;box-shadow:0 8px 32px rgba(0,0,0,.5);animation:pmIn .15s ease}
+.formula-balloon-title{font-size:11px;font-weight:700;color:var(--cyan);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.formula-balloon-text{font-size:13px;color:var(--t2);line-height:1.6}
+.formula-balloon-close{position:absolute;top:10px;right:10px;background:none;border:none;color:var(--t3);cursor:pointer;font-size:14px;line-height:1}
+
 .ag-notif-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06)}
 .ag-notif-row:last-child{border-bottom:none}
 .ag-toggle{position:relative;width:44px;height:24px;flex-shrink:0}
@@ -1327,6 +1366,16 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
 <div id="loading"><div class="spinner"></div><div><div class="lt">Analisando laudo com IA…</div><div class="ls" id="lfn"></div></div></div>
 <div id="error-msg"></div>
 
+<!-- FORMULA BALLOON -->
+<div id="formula-balloon" class="formula-balloon" style="display:none">
+  <button class="formula-balloon-close" onclick="closeFormulaBalloon()">✕</button>
+  <div class="formula-balloon-title">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18"/></svg>
+    Fórmula manipulada
+  </div>
+  <div class="formula-balloon-text" id="formula-balloon-text"></div>
+</div>
+
 <!-- CHRONIA TOAST/ALERT/CONFIRM -->
 <div id="ch-toast">
   <div class="ct-backdrop" id="ct-backdrop"></div>
@@ -1443,9 +1492,8 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
             </div>
           </div>
           <div class="ag-field">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-              <div class="ag-label" style="margin-bottom:0">Horários</div>
-              <button onclick="addScheduleRow()" style="background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.2);border-radius:7px;padding:4px 10px;font-family:'Inter',sans-serif;font-size:11px;font-weight:600;color:var(--cyan);cursor:pointer">+ horário</button>
+            <div style="margin-bottom:6px">
+              <div class="ag-label" style="margin-bottom:0">Horários <span style="color:var(--t3);font-size:10px;font-weight:400;text-transform:none">(máx. 3)</span></div>
             </div>
             <div id="mf-schedules"></div>
           </div>
