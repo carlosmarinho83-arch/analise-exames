@@ -104,6 +104,25 @@ window.doRegister = async () => {
   }
 };
 
+function checkProfileComplete(){
+  const p=currentProfile;
+  if(!p.name||!p.sex||!p.age||!p.weight){
+    const missing=[];
+    if(!p.name)missing.push('Nome completo');
+    if(!p.sex)missing.push('Sexo');
+    if(!p.age)missing.push('Idade');
+    if(!p.weight)missing.push('Peso');
+    showErr('Preencha seu perfil antes de importar: '+missing.join(', ')+'. Acesse a aba Perfil.');
+    return false;
+  }
+  return true;
+}
+
+function openImport(){
+  if(!checkProfileComplete())return;
+  openImport();
+}
+
 window.saveProfile = async () => {
   const name = document.getElementById('pf-name').value.trim();
   const sex  = document.getElementById('pf-sex').value;
@@ -539,7 +558,7 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
       <div class="empty-icon">📄</div>
       <div class="empty-title">Nenhum laudo importado</div>
       <div class="empty-desc">Importe seus laudos em PDF para começar</div>
-      <button class="btn-import" onclick="document.getElementById('fi').click()">+ Importar laudo</button>
+      <button class="btn-import" onclick="openImport()">+ Importar laudo</button>
     </div>
 
     <!-- Filled state -->
@@ -571,7 +590,7 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
             <div class="tl-line"></div>
             <div class="tl-dots" id="tl-dots"></div>
           </div>
-          <button class="tl-import-btn" onclick="document.getElementById('fi').click()">
+          <button class="tl-import-btn" onclick="openImport()">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             <span>Importar<br>exame</span>
           </button>
@@ -591,7 +610,7 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
       <button class="filter-tab active" onclick="setF('todos',this)">Todos</button>
       <button class="filter-tab" onclick="setF('recentes',this)">Recentes</button>
     </div>
-    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('fi').click()">
+    <div class="drop-zone" id="drop-zone" onclick="openImport()">
       <div class="dz-icon-wrap">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#06B6D4" stroke-width="1.8" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
       </div>
@@ -779,7 +798,7 @@ window.exams = [];
 let chartInst={},curNav='inicio',curFilter='todos';
 
 /* ── FILE INPUT ── */
-document.getElementById('fi').addEventListener('change',e=>go(e.target.files));
+document.getElementById('fi').addEventListener('change',e=>{if(!checkProfileComplete()){e.target.value='';return;}go(e.target.files);});
 const dz=document.getElementById('drop-zone');
 dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag');});
 dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
@@ -823,8 +842,9 @@ REGRAS OBRIGATÓRIAS:
           const p=currentProfile;
           let ctx='';
           if(p.sex||p.age||p.weight){
+            const ageGroup=p.age&&Number(p.age)<=18?'criança/adolescente (0-18 anos)':'adulto';
             ctx=' Dados do paciente para contextualizar as referências:';
-            if(p.sex)ctx+=' Sexo: '+p.sex+'.';
+            if(p.sex)ctx+=' Sexo: '+p.sex+'.';if(p.age)ctx+=' Faixa etária: '+ageGroup+'.';
             if(p.age)ctx+=' Idade: '+p.age+' anos.';
             if(p.weight)ctx+=' Peso: '+p.weight+'kg.';
             ctx+=' Use esses dados para validar se os valores de referência do laudo são adequados para este perfil.';
