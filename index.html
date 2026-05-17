@@ -730,7 +730,7 @@ async function go(files){
   for(const f of pdfs){
     load(true,f.name);
     try{const b64=await toB64(f);const r=await claude(b64,f.name);
-      const newExam={id:Date.now()+Math.random(),fn:f.name,...r};
+      const newExam={id:Date.now()+'_'+Math.floor(Math.random()*10000),fn:f.name,...r};
       window.exams.push(newExam);
       if(window.fbSave)window.fbSave(newExam);
       document.getElementById('fi').value='';}
