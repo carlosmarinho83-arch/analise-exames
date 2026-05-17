@@ -1231,6 +1231,7 @@ body{font-family:'Inter',sans-serif;color:var(--t1);max-width:430px;margin:0 aut
 .report-body{display:none;border-top:1px solid rgba(255,255,255,.06)}
 .report-card.open .report-body{display:block}
 .tbl-wrap{overflow-x:hidden}
+.result-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:10px 12px}
 table{width:100%;border-collapse:collapse}
 th{font-size:10px;font-weight:600;color:var(--t3);letter-spacing:1px;text-transform:uppercase;text-align:left;padding:9px 10px;background:rgba(255,255,255,.02)}
 td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);color:var(--t1)}
@@ -2160,13 +2161,21 @@ REGRAS ABSOLUTAS — SIGA TODAS SEM EXCEÇÃO:
    - Texto corrido como "Referência: Masculino 3,5 a 5,5" → use o intervalo do sexo do paciente
    - Formatos aceitos (TODOS devem ser reconhecidos):
      * Intervalos: "3,5 - 5,5", "3.5 - 5.5", "3,5 a 5,5", "entre 3,5 e 5,5", "10,0 – 40,0"
-     * Limite superior: "até 40", "< 40", "menor que 40", "inferior a 40", "INFERIOR OU IGUAL A 40", "≤ 40", "no máximo 40", "abaixo de 40"
-     * Limite inferior: "> 5", "acima de 5", "maior que 5", "superior a 5", "SUPERIOR OU IGUAL A 5", "≥ 5", "no mínimo 5", "acima de 5"
-     * Conversão obrigatória: "INFERIOR OU IGUAL A 40" → refMin=null, refMax=40. "SUPERIOR OU IGUAL A 5" → refMin=5, refMax=null
-   - Referências por sexo: se houver "HOMENS: X" e "MULHERES: Y", use o valor do sexo do paciente informado no perfil
+     * Limite superior (refMax): "até 40", "< 40", "menor que 40", "inferior a 40", "INFERIOR A 40", "INFERIOR OU IGUAL A 40", "≤ 40", "no máximo 40", "abaixo de 40"
+     * Limite inferior (refMin): "> 5", "acima de 5", "maior que 5", "superior a 5", "SUPERIOR A 5", "SUPERIOR OU IGUAL A 5", "≥ 5", "no mínimo 5"
+     * Conversão obrigatória:
+       - "INFERIOR A 40" ou "INFERIOR OU IGUAL A 40" → refMin=null, refMax=40
+       - "SUPERIOR A 5" ou "SUPERIOR OU IGUAL A 5" → refMin=5, refMax=null
+   - Referências por faixa etária — MUITO IMPORTANTE:
+     * Laudos brasileiros frequentemente apresentam referências separadas por faixa: "PARA ADULTOS ACIMA DE 20 ANOS: SUPERIOR A 40 mg/dL" e "PARA CRIANÇAS E ADOLESCENTES: SUPERIOR A 45 mg/dL"
+     * Use a faixa que corresponde à idade do paciente. Se adulto (≥20 anos), use a referência de adultos. Se criança/adolescente (<20 anos), use a outra.
+     * Se não souber a idade, use a referência de adultos como padrão
+   - Referências por sexo: se houver "HOMENS: X" e "MULHERES: Y", use o valor do sexo do paciente
    - Se não souber o sexo, use o intervalo mais abrangente
-   - Referências por faixa etária: use a faixa que corresponde à idade do paciente
-   - Conversão: "até 40" → refMin=null, refMax=40. "> 5" → refMin=5, refMax=null. "3,5 a 5,5" → refMin=3.5, refMax=5.5
+   - Conversão de valores: "até 40" → refMin=null, refMax=40. "> 5" → refMin=5, refMax=null. "3,5 a 5,5" → refMin=3.5, refMax=5.5
+   - IGNORE textos como "VALORES REFERENCIAIS DESEJÁVEIS" — são apenas descrições, não os valores
+   - Quando houver referências separadas por jejum, ex: "COM JEJUM: INFERIOR A 150 mg/dL SEM JEJUM: INFERIOR A 175 mg/dL", use SEMPRE o valor mais restritivo (com jejum), pois é o mais conservador. No exemplo: refMax=150
+   - "COM OU SEM JEJUM" seguido de um único valor significa que a referência é a mesma nos dois casos — extraia normalmente
    - Vírgula decimal brasileira: "1,38" = 1.38. "3,5" = 3.5
    - SOMENTE use null se após varrer TODO o documento não houver NENHUMA referência para aquele exame
 
@@ -2344,25 +2353,32 @@ function rExames(){
         </div>
         <button class="btn-expand" onclick="event.stopPropagation();tog(this.closest('.report-card').querySelector('.report-hdr'))"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg></button>
       </div>
-      <div class="report-body"><div class="tbl-wrap"><table>
-        <thead><tr><th>Exame</th><th>Valor</th><th>Unidade</th><th>Referência</th></tr></thead>
-        <tbody>${(q?mr:(exam.results||[])).map(r=>{
+      <div class="report-body"><div style="padding:10px 12px;display:flex;flex-direction:column;gap:6px">
+        ${(q?mr:(exam.results||[])).map(r=>{
           const si=statusInfo(r.status);
           const col=eColor(r.name);
-          const dotColor=si.cls==='b-normal'?'#10B981':si.cls==='b-low'||si.cls==='b-high'?'#EF4444':si.cls==='b-attention'?'#F59E0B':'#64748B';
           const hasRef=r.refMin!=null||r.refMax!=null;
-          const refCell=hasRef
-            ?`<span style="color:var(--t3)">${r.refMin!=null?r.refMin:'?'}–${r.refMax!=null?r.refMax:'?'}</span>`
-            :`<button onclick="openRefEdit('${exam.id}','${r.name.replace(/'/g,"\'")}',event)" style="display:inline-flex;align-items:center;gap:4px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);border-radius:6px;padding:3px 8px;cursor:pointer;font-family:'Inter',sans-serif;font-size:11px;font-weight:600;color:#F59E0B"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Preencher</button>`;
-          return`<tr>
-            <td style="color:var(--t1)">${r.name}</td>
-            <td><span style="display:inline-flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:${dotColor};flex-shrink:0"></span><span class="val-td" style="color:${col}">${fv(r.value)}</span></span></td>
-            <td style="color:var(--t4)">${r.unit||'—'}</td>
-            <td>${refCell}</td>
-          </tr>`;
-        }).join('')}</tbody>
-      </table></div></div>`;
-    list.appendChild(el);
+          const statusColor=si.cls==='b-normal'?'#10B981':si.cls==='b-low'||si.cls==='b-high'?'#EF4444':si.cls==='b-attention'?'#F59E0B':'#64748B';
+          const statusBg=si.cls==='b-normal'?'rgba(16,185,129,.1)':si.cls==='b-low'||si.cls==='b-high'?'rgba(239,68,68,.1)':si.cls==='b-attention'?'rgba(245,158,11,.1)':'rgba(100,116,139,.1)';
+          const refPart=hasRef
+            ?`<span style="font-size:11px;color:var(--t3)">Ref: ${r.refMin!=null?r.refMin:'?'}–${r.refMax!=null?r.refMax:'?'} ${r.unit||''}</span>`
+            :`<button onclick="openRefEdit('${exam.id}','${r.name.replace(/'/g,"\\'")}',event)" style="display:inline-flex;align-items:center;gap:3px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);border-radius:6px;padding:2px 7px;cursor:pointer;font-family:'Inter',sans-serif;font-size:10px;font-weight:600;color:#F59E0B;flex-shrink:0"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Sem referência</button>`;
+          return`<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:10px 12px">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">
+              <span style="font-size:12px;font-weight:600;color:var(--t1);line-height:1.3;flex:1">${r.name}</span>
+              <span style="font-size:10px;font-weight:700;border-radius:6px;padding:2px 8px;background:${statusBg};color:${statusColor};flex-shrink:0;white-space:nowrap">${si.label||r.status}</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+              <div style="display:flex;align-items:baseline;gap:4px">
+                <span style="font-size:20px;font-weight:700;color:${col};letter-spacing:-.5px">${fv(r.value)}</span>
+                <span style="font-size:11px;color:var(--t3)">${r.unit||''}</span>
+              </div>
+              ${refPart}
+            </div>
+          </div>`;
+        }).join('')}
+      </div></div>`;
+list.appendChild(el);
   });
 }
 function setF(f,el){curFilter=f;document.querySelectorAll('.filter-tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');rExames();}
