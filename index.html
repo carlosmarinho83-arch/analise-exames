@@ -966,12 +966,12 @@ function rCharts(){
       }]},
       options:{responsive:true,maintainAspectRatio:false,
         plugins:{legend:{display:false},tooltip:{backgroundColor:'#0F172A',borderColor:'#334155',borderWidth:1,titleColor:'#64748B',bodyColor:col,bodyFont:{weight:'700',size:15,family:'Inter'},callbacks:{label:c=>fv(c.raw)+(unit?' '+unit:'')}}},
-        scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#64748B',font:{size:11,weight:'500',family:'Inter'}}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#64748B',font:{size:11,family:'Inter'}}}}
+        scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#64748B',font:{size:11,weight:'500',family:'Inter'},maxRotation:0}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#64748B',font:{size:11,family:'Inter'}},afterFit(scale){scale.width=48;}}}
       },
       plugins:[{id:'refs',afterDraw(chart){
         if(refMin==null&&refMax==null)return;
         const{ctx:c,scales:{x,y}}=chart;c.save();
-        [[refMin,'#F59E0B'],[refMax,'#EF4444']].forEach(([v,cl])=>{if(v==null)return;const yp=y.getPixelForValue(v);c.setLineDash([5,3]);c.strokeStyle=cl+'70';c.lineWidth=1.5;c.beginPath();c.moveTo(x.left,yp);c.lineTo(x.right,yp);c.stroke();});
+        [[refMin,'#F59E0B'],[refMax,'#EF4444']].forEach(([v,cl])=>{if(v==null)return;const yp=y.getPixelForValue(v);if(yp<y.top||yp>y.bottom)return;c.setLineDash([5,3]);c.strokeStyle=cl+'70';c.lineWidth=1.5;c.beginPath();c.moveTo(x.left,yp);c.lineTo(x.right,yp);c.stroke();});
         c.restore();
       }}]
     });
