@@ -30,14 +30,40 @@ let currentProfile = {name:'', sex:'', birthdate:'', age:'', weight:'', height:'
 // ── FIREBASE DATA ──────────────────────────────────────────────────────────
 function userRef() { return `users/${currentUID}/exames`; }
 
-window.fbSave   = async exam => { try { await db.ref(userRef()+'/'+exam.id).set(exam); } catch(e){console.error(e);} };
-window.fbRemove = async id   => { try { await db.ref(userRef()+'/'+id).remove(); } catch(e){console.error(e);} };
+window.fbSave   = async exam => {
+  try {
+    await db.ref(userRef()+'/'+exam.id).set(exam);
+    // Save to permanent archive too
+    await db.ref(`users/${currentUID}/archive/${exam.id}`).set({...exam, archivedAt: Date.now()});
+  } catch(e){console.error(e);}
+};
+window.fbRemove = async id => {
+  try {
+    await db.ref(userRef()+'/'+id).remove();
+    // Do NOT remove from archive — that's permanent
+  } catch(e){console.error(e);}
+};
 window.fbLoad   = async () => {
   try {
     const snap = await db.ref(userRef()).get();
     window.exams = snap.exists() ? Object.values(snap.val()).map(e=>({...e,id:String(e.id)})) : [];
   } catch(e) { console.error('Firebase load error:',e); window.exams=[]; }
   render();
+};
+window.fbLoadArchive = async () => {
+  try {
+    const snap = await db.ref(`users/${currentUID}/archive`).get();
+    return snap.exists() ? Object.values(snap.val()) : [];
+  } catch(e){ return []; }
+};
+window.fbSaveHash = async (hash, examId) => {
+  try { await db.ref(`users/${currentUID}/hashes/${hash}`).set({examId, importedAt: Date.now()}); } catch(e){}
+};
+window.fbCheckHash = async (hash) => {
+  try {
+    const snap = await db.ref(`users/${currentUID}/hashes/${hash}`).get();
+    return snap.exists() ? snap.val() : null;
+  } catch(e){ return null; }
 };
 
 // ── AUTH STATE ─────────────────────────────────────────────────────────────
@@ -708,6 +734,51 @@ function scheduleNotifs(){
     const due=m.freq==='diario'||m.days.includes(today.getDay());
     if(due)new Notification('💊 '+m.name,{body:m.time+(m.qty?' · '+m.qty:''),icon:'/favicon.ico'});
   });
+}
+
+/* ── ARCHIVE ── */
+async function openArchive(){
+  document.getElementById('archive-modal').style.display='flex';
+  const list=document.getElementById('archive-list');
+  list.innerHTML='<div style="text-align:center;color:var(--t3);font-size:13px;padding:32px 0">Carregando...</div>';
+  const archive=await window.fbLoadArchive();
+  if(!archive.length){
+    list.innerHTML='<div style="text-align:center;color:var(--t3);font-size:13px;padding:32px 0">Nenhum laudo arquivado ainda.</div>';
+    return;
+  }
+  // Sort by date desc
+  archive.sort((a,b)=>(b.archivedAt||0)-(a.archivedAt||0));
+  list.innerHTML=archive.map(e=>{
+    const inCurrent=window.exams.find(x=>String(x.id)===String(e.id));
+    const dateStr=e.date?new Date(e.date+'T12:00:00').toLocaleDateString('pt-BR'):'—';
+    const importedStr=e.archivedAt?new Date(e.archivedAt).toLocaleDateString('pt-BR'):'—';
+    return`<div style="background:var(--card);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.lab||e.fn||'Laudo'}</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:2px">Coleta: ${dateStr} · Importado: ${importedStr}</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:1px">${(e.results||[]).length} exames</div>
+      </div>
+      ${inCurrent
+        ?`<span style="font-size:11px;font-weight:600;color:#10B981;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.2);border-radius:8px;padding:4px 10px;flex-shrink:0">Ativo</span>`
+        :`<button onclick="recoverExam('${e.id}')" style="background:linear-gradient(135deg,#2563EB,#06B6D4);border:none;border-radius:10px;padding:7px 14px;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;color:#fff;cursor:pointer;flex-shrink:0">Recuperar</button>`
+      }
+    </div>`;
+  }).join('');
+}
+
+function closeArchive(){
+  document.getElementById('archive-modal').style.display='none';
+}
+
+async function recoverExam(id){
+  const archive=await window.fbLoadArchive();
+  const exam=archive.find(e=>String(e.id)===String(id));
+  if(!exam){chAlert('error','Não encontrado','Laudo não encontrado no arquivo.');return;}
+  window.exams.push(exam);
+  await db.ref(userRef()+'/'+exam.id).set(exam);
+  render();
+  closeArchive();
+  chAlert('success','Laudo recuperado!','O laudo foi restaurado sem nenhum custo.');
 }
 
 /* ── TEST DATA ── */
@@ -1383,6 +1454,28 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
 <div id="loading"><div class="spinner"></div><div><div class="lt">Analisando laudo com IA…</div><div class="ls" id="lfn"></div></div></div>
 <div id="error-msg"></div>
 
+<!-- ARCHIVE MODAL -->
+<div id="archive-modal" style="display:none;position:fixed;inset:0;z-index:400;align-items:flex-end;justify-content:center">
+  <div style="position:absolute;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(4px)" onclick="closeArchive()"></div>
+  <div style="position:relative;background:#0F172A;border-radius:24px 24px 0 0;width:100%;max-width:430px;z-index:1;animation:dpIn .25s ease;max-height:85vh;display:flex;flex-direction:column">
+    <div style="padding:18px 20px 14px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:10px">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+          <div style="font-size:17px;font-weight:700">Laudos arquivados</div>
+        </div>
+        <button onclick="closeArchive()" style="background:rgba(255,255,255,.07);border:none;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--t2)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div style="font-size:12px;color:var(--t3);margin-top:6px">Todos os laudos já importados — nunca apagados</div>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:16px 20px 32px" id="archive-list">
+      <div style="text-align:center;color:var(--t3);font-size:13px;padding:32px 0">Carregando...</div>
+    </div>
+  </div>
+</div>
+
 <!-- FORMULA BALLOON -->
 <div id="formula-balloon" class="formula-balloon" style="display:none">
   <button class="formula-balloon-close" onclick="closeFormulaBalloon()">✕</button>
@@ -1987,16 +2080,58 @@ async function go(files){
   hideErr();
   for(const f of pdfs){
     load(true,f.name);
-    try{const b64=await toB64(f);const r=await claude(b64,f.name);
-      const newExam={id:Date.now()+'_'+Math.floor(Math.random()*10000),fn:f.name,...r};
+    try{
+      // ── Check hash before calling API ──
+      const hash = await hashFile(f);
+      const existing = await window.fbCheckHash(hash);
+      if(existing){
+        load(false);
+        // Check if it's in current exams or only in archive
+        const inCurrent = window.exams.find(e=>String(e.id)===String(existing.examId));
+        if(inCurrent){
+          chAlert('info','Laudo já importado','Este PDF já foi importado anteriormente. Nenhum crédito foi consumido.');
+        } else {
+          // Offer to recover from archive
+          chConfirm(
+            'Laudo encontrado no arquivo',
+            'Este PDF já foi importado antes mas foi excluído. Deseja recuperá-lo sem custo?',
+            async ()=>{
+              const archive = await window.fbLoadArchive();
+              const archived = archive.find(e=>String(e.id)===String(existing.examId));
+              if(archived){
+                window.exams.push(archived);
+                await db.ref(userRef()+'/'+archived.id).set(archived);
+                render();
+                chAlert('success','Laudo recuperado!','O laudo foi restaurado sem nenhum custo.');
+              } else {
+                chAlert('error','Não encontrado','O laudo não foi encontrado no arquivo.');
+              }
+            }
+          );
+        }
+        document.getElementById('fi').value='';
+        continue;
+      }
+      // ── New file — call API ──
+      const b64=await toB64(f);
+      const r=await claude(b64,f.name);
+      const newExam={id:Date.now()+'_'+Math.floor(Math.random()*10000),fn:f.name,hash,...r};
       window.exams.push(newExam);
-      if(window.fbSave)window.fbSave(newExam);
-      document.getElementById('fi').value='';}
+      if(window.fbSave)await window.fbSave(newExam);
+      await window.fbSaveHash(hash, newExam.id);
+      document.getElementById('fi').value='';
+    }
     catch(e){showErr('Erro em "'+f.name+'": '+e.message);}
   }
   load(false);render();
 }
 function toB64(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=()=>rej(new Error('Falha'));r.readAsDataURL(f);});}
+
+async function hashFile(f){
+  const buf=await f.arrayBuffer();
+  const digest=await crypto.subtle.digest('SHA-256',buf);
+  return Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
 
 /* ── CLAUDE API ── */
 async function claude(b64,fn){
