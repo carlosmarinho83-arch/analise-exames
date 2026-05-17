@@ -2145,22 +2145,32 @@ REGRAS ABSOLUTAS — SIGA TODAS SEM EXCEÇÃO:
 
 1. FORMATO DE SAÍDA: Retorne APENAS JSON puro. Sem markdown, sem texto, sem comentários, sem quebras antes do JSON.
 
-2. EXTRAIA TODOS OS EXAMES: Cada linha ou item com nome e valor numérico é um exame. Não pule nenhum.
+2. EXTRAIA TODOS OS EXAMES SEM EXCEÇÃO: Cada linha, item ou seção com nome e valor numérico é um exame. Inclua hemograma completo (cada série separadamente), urina, fezes, hormônios, vitaminas, lipídios, enzimas, eletrólitos — absolutamente tudo.
 
-3. VALORES DE REFERÊNCIA — PRIORIDADE MÁXIMA:
-   - Procure em TODA a área ao redor do resultado: à direita, abaixo, em colunas separadas, em notas de rodapé, em cabeçalhos de seção.
-   - Padrões a reconhecer: "VR:", "Ref.:", "Referência:", "Valores de referência:", "Normal:", intervalos "10,0 - 40,0", "10.0 - 40.0", "10 a 40", "< 40", "até 40", "> 5", "acima de 5", "menor que", "maior que".
-   - Expressões como "até 40" → refMin=null, refMax=40. "maior que 5" → refMin=5, refMax=null. "10 a 40" → refMin=10, refMax=40.
-   - Vírgula decimal brasileira: "1,38" = 1.38 em float.
-   - Se o laudo tiver tabela com coluna de referência, leia cada linha individualmente.
-   - Só use null quando absolutamente não houver nenhuma referência em lugar algum do documento para aquele exame.
+3. VALORES DE REFERÊNCIA — ESTA É A REGRA MAIS IMPORTANTE:
+   VOCÊ DEVE extrair o valor de referência de CADA exame. Procure em:
+   - Coluna "Valores de Referência", "VR", "Referência", "Ref.", "Normal", "Faixa de referência"
+   - Texto logo abaixo ou ao lado do resultado
+   - Texto corrido como "Referência: Masculino 3,5 a 5,5" → use o intervalo do sexo do paciente
+   - Formatos aceitos: "3,5 - 5,5", "3.5 - 5.5", "3,5 a 5,5", "até 40", "< 40", "> 5", "acima de 5", "menor que 10", "10,0 – 40,0"
+   - Referências por sexo: se houver "Masculino: X - Y" e o paciente for masculino, use esse intervalo
+   - Referências por faixa etária: use a faixa que corresponde à idade do paciente
+   - Conversão: "até 40" → refMin=null, refMax=40. "> 5" → refMin=5, refMax=null. "3,5 a 5,5" → refMin=3.5, refMax=5.5
+   - Vírgula decimal brasileira: "1,38" = 1.38. "3,5" = 3.5
+   - SOMENTE use null se após varrer TODO o documento não houver NENHUMA referência para aquele exame
 
-4. STATUS: Compare value com refMin/refMax. value > refMax → "alto". value < refMin → "baixo". Entre os dois → "normal". Sem referência → "indeterminado".
+4. STATUS OBRIGATÓRIO: Após extrair refMin/refMax, calcule:
+   - value > refMax → "alto"
+   - value < refMin → "baixo"
+   - refMin ≤ value ≤ refMax → "normal"
+   - refMin e refMax ambos null → "indeterminado"
 
-5. VALUE: Sempre número (float ou int). Nunca string. Converta vírgula para ponto.
+5. VALUE: Sempre número JavaScript (float ou int). NUNCA string. Converta vírgula para ponto decimal.
 
-6. FORMATO OBRIGATÓRIO:
-{"date":"YYYY-MM-DD ou null","lab":"nome do laboratório ou null","patient":"nome do paciente ou null","results":[{"name":"nome completo do exame","value":numero,"unit":"unidade","refMin":numero_ou_null,"refMax":numero_ou_null,"status":"normal|alto|baixo|indeterminado"}]}`,
+6. NOMES DOS EXAMES: Use o nome completo exatamente como aparece no laudo. Não abrevie.
+
+7. FORMATO DE SAÍDA OBRIGATÓRIO — não desvie nem um caractere:
+{"date":"YYYY-MM-DD ou null","lab":"nome do laboratório ou null","patient":"nome do paciente ou null","results":[{"name":"nome completo do exame","value":numero,"unit":"unidade de medida","refMin":numero_ou_null,"refMax":numero_ou_null,"status":"normal|alto|baixo|indeterminado"}]}`,
       messages:[{role:'user',content:[
         {type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},
         {type:'text',text:(()=>{
@@ -2174,7 +2184,7 @@ REGRAS ABSOLUTAS — SIGA TODAS SEM EXCEÇÃO:
             if(p.weight)ctx+=' Peso: '+p.weight+'kg.';if(p.height)ctx+=' Altura: '+p.height+'cm.';
             ctx+=' Use esses dados para validar se os valores de referência do laudo são adequados para este perfil.';
           }
-          return 'Extraia todos os dados deste laudo ('+fn+'). Preste especial atenção aos valores de referência — eles costumam aparecer após o resultado na forma de intervalos (ex: 10,0 - 40,0) ou como VR/Referência. Retorne o JSON conforme instruído.'+ctx;
+          return 'Extraia TODOS os exames deste laudo ('+fn+') sem exceção. Para CADA exame, você DEVE encontrar e extrair o valor de referência — ele está no documento, procure em todas as colunas, textos adjacentes e rodapés. Laudos brasileiros frequentemente colocam a referência em texto corrido abaixo do resultado ou em coluna separada. Não retorne null para refMin/refMax se a referência estiver visível no documento. Retorne o JSON conforme as instruções do sistema.'+ctx;
         })()}
       ]}]
     })
