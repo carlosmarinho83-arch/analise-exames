@@ -132,6 +132,97 @@ function openImport(){
   openImport();
 }
 
+/* ── CHRONIA TOAST ── */
+function chAlert(type,title,msg,onOk){
+  const icons={
+    success:'<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>',
+    error:'<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+    info:'<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#06B6D4" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
+  };
+  const colors={success:'rgba(16,185,129,.12)',error:'rgba(239,68,68,.12)',info:'rgba(6,182,212,.12)'};
+  const borders={success:'rgba(16,185,129,.2)',error:'rgba(239,68,68,.2)',info:'rgba(6,182,212,.2)'};
+  document.getElementById('ct-icon').style.cssText=`background:${colors[type]};border:1px solid ${borders[type]}`;
+  document.getElementById('ct-icon').innerHTML=icons[type]||icons.info;
+  document.getElementById('ct-title').textContent=title;
+  document.getElementById('ct-msg').textContent=msg;
+  document.getElementById('ct-actions').innerHTML=`<button class="ct-btn ct-btn-ok" onclick="closeChToast(${onOk?'true':'false'})">OK</button>`;
+  document.getElementById('ch-toast').classList.add('open');
+  window._chToastCb=onOk||null;
+}
+function chConfirm(title,msg,onConfirm){
+  document.getElementById('ct-icon').style.cssText='background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.2)';
+  document.getElementById('ct-icon').innerHTML='<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2.5" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+  document.getElementById('ct-title').textContent=title;
+  document.getElementById('ct-msg').textContent=msg;
+  document.getElementById('ct-actions').innerHTML=`<button class="ct-btn ct-btn-cancel" onclick="closeChToast(false)">Cancelar</button><button class="ct-btn ct-btn-danger" onclick="closeChToast(true)">Confirmar</button>`;
+  document.getElementById('ch-toast').classList.add('open');
+  window._chToastCb=onConfirm||null;
+}
+function closeChToast(run){
+  document.getElementById('ch-toast').classList.remove('open');
+  if(run&&window._chToastCb)window._chToastCb();
+  window._chToastCb=null;
+}
+
+/* ── DATE PICKER ── */
+const MONTHS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+let _dpDay=1,_dpMonth=1,_dpYear=new Date().getFullYear()-30;
+
+function openDatePicker(){
+  const cur=document.getElementById('pf-birthdate').value;
+  if(cur){const[y,m,d]=cur.split('-');_dpYear=+y;_dpMonth=+m;_dpDay=+d;}
+  buildPicker();
+  document.getElementById('date-picker-modal').classList.add('open');
+}
+function closeDatePicker(){document.getElementById('date-picker-modal').classList.remove('open');}
+function confirmDatePicker(){
+  const y=String(_dpYear).padStart(4,'0');
+  const m=String(_dpMonth).padStart(2,'0');
+  const d=String(_dpDay).padStart(2,'0');
+  const val=`${y}-${m}-${d}`;
+  document.getElementById('pf-birthdate').value=val;
+  document.getElementById('pf-birthdate-text').textContent=`${d}/${m}/${y}`;
+  document.getElementById('pf-birthdate-text').style.color='var(--t1)';
+  updateAgeDisplay();
+  closeDatePicker();
+}
+function buildPicker(){
+  const now=new Date();
+  const days=Array.from({length:31},(_,i)=>i+1);
+  const months=MONTHS.map((m,i)=>({v:i+1,l:m}));
+  const curY=now.getFullYear();
+  const years=Array.from({length:120},(_,i)=>curY-i);
+  buildCol('dp-day',days.map(d=>({v:d,l:String(d).padStart(2,'0')})),_dpDay,(v)=>{_dpDay=v;});
+  buildCol('dp-month',months.map(m=>({v:m.v,l:m.l})),_dpMonth,(v)=>{_dpMonth=v;});
+  buildCol('dp-year',years.map(y=>({v:y,l:String(y)})),_dpYear,(v)=>{_dpYear=v;});
+}
+function buildCol(id,items,selected,onChange){
+  const el=document.getElementById(id);
+  el.innerHTML=items.map(it=>`<div class="dp-item${it.v===selected?' selected':''}" data-v="${it.v}">${it.l}</div>`).join('');
+  // scroll to selected
+  const selEl=el.querySelector('.selected');
+  if(selEl)setTimeout(()=>el.scrollTo({top:selEl.offsetTop-72,behavior:'instant'}),10);
+  // snap on scroll
+  let tmo;
+  el.onscroll=()=>{
+    clearTimeout(tmo);
+    tmo=setTimeout(()=>{
+      const center=el.scrollTop+72+28;
+      let closest=null,minD=Infinity;
+      el.querySelectorAll('.dp-item').forEach(item=>{
+        const d=Math.abs(item.offsetTop-center+item.offsetHeight/2);
+        if(d<minD){minD=d;closest=item;}
+      });
+      if(closest){
+        el.querySelectorAll('.dp-item').forEach(i=>i.classList.remove('selected'));
+        closest.classList.add('selected');
+        onChange(Number(closest.dataset.v));
+        el.scrollTo({top:closest.offsetTop-72,behavior:'smooth'});
+      }
+    },80);
+  };
+}
+
 function formatCPF(input){
   let v=input.value.replace(/\D/g,'').slice(0,11);
   if(v.length>9)v=v.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/,'$1.$2.$3-$4');
@@ -147,8 +238,8 @@ window.saveProfile = async () => {
   const weight = document.getElementById('pf-weight').value;
   const height = document.getElementById('pf-height').value;
   const cpf = document.getElementById('pf-cpf').value.trim();
-  if(!name){alert('Digite seu nome completo.');return;}
-  if(!birthdate){alert('Informe sua data de nascimento.');return;}
+  if(!name){chAlert('error','Nome obrigatório','Digite seu nome completo.');return;}
+  if(!birthdate){chAlert('error','Data obrigatória','Informe sua data de nascimento.');return;}
   const age = birthdate ? calcAge(birthdate) : null;
   try{
     await db.ref(`users/${currentUID}/profile`).set({name,sex,birthdate,age,weight:weight?Number(weight):null,height:height?Number(height):null,cpf,email:firebase.auth().currentUser.email});
@@ -159,8 +250,8 @@ window.saveProfile = async () => {
     const avatarEl=document.getElementById('avatar-el');if(avatarEl)avatarEl.textContent=first.charAt(0).toUpperCase();
     const perfilName=document.getElementById('perfil-name');if(perfilName)perfilName.textContent=name;
     const perfilAvatar=document.getElementById('perfil-avatar');if(perfilAvatar)perfilAvatar.textContent=first.charAt(0).toUpperCase();
-    alert('Perfil salvo!');
-  }catch(e){alert('Erro ao salvar: '+e.message);}
+    chAlert('success','Perfil salvo!','Seus dados foram atualizados com sucesso.');
+  }catch(e){chAlert('error','Erro ao salvar',e.message);}
 };
 
 function calcAge(birthdate){
@@ -191,10 +282,10 @@ function updateAgeDisplay(){
 }
 
 window.doLogout = async () => {
-  if(confirm('Deseja sair da sua conta?')) {
+  chConfirm('Sair da conta?','Você será desconectado do Chronia.',()=>{
     await auth.signOut();
     window.exams = [];
-  }
+  });
 };
 
 function showApp() {
@@ -438,6 +529,41 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
 .lt{color:var(--cyan);font-size:14px;font-weight:600}
 .ls{color:var(--t2);font-size:12px;margin-top:2px}
 #error-msg{display:none;position:fixed;bottom:calc(var(--nav-h) + 10px);left:10px;right:10px;max-width:410px;margin:0 auto;z-index:200;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.25);border-radius:12px;padding:12px 16px;color:var(--red);font-size:13px}
+/* CHRONIA TOAST */
+#ch-toast{display:none;position:fixed;inset:0;z-index:400;align-items:center;justify-content:center;padding:24px}
+#ch-toast.open{display:flex}
+.ct-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(4px)}
+.ct-box{position:relative;background:linear-gradient(160deg,#0C1E3D,#0F2847);border-radius:22px;padding:26px 22px;width:100%;max-width:340px;z-index:1;animation:pmIn .2s ease;text-align:center}
+.ct-icon{width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+.ct-title{font-size:17px;font-weight:700;margin-bottom:8px;color:var(--t1)}
+.ct-msg{font-size:13px;color:var(--t2);line-height:1.6;margin-bottom:20px}
+.ct-actions{display:flex;gap:10px}
+.ct-btn{flex:1;border:none;border-radius:12px;padding:12px;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;cursor:pointer}
+.ct-btn-ok{background:linear-gradient(135deg,#2563EB,#06B6D4);color:#fff}
+.ct-btn-cancel{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1)!important;color:var(--t2)}
+.ct-btn-danger{background:linear-gradient(135deg,#EF4444,#DC2626);color:#fff}
+
+/* DATE PICKER MODAL */
+#date-picker-modal{display:none;position:fixed;inset:0;z-index:400;align-items:flex-end;justify-content:center}
+#date-picker-modal.open{display:flex}
+.dp-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px)}
+.dp-box{position:relative;background:#0F172A;border-radius:24px 24px 0 0;padding:20px 20px 32px;width:100%;max-width:430px;z-index:1;animation:dpIn .25s ease}
+@keyframes dpIn{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.dp-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.dp-title{font-size:16px;font-weight:700}
+.dp-confirm{background:linear-gradient(135deg,#2563EB,#06B6D4);border:none;border-radius:10px;padding:8px 18px;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;color:#fff;cursor:pointer}
+.dp-cols{display:flex;gap:8px;height:200px}
+.dp-col{flex:1;overflow:hidden;position:relative}
+.dp-col::before,.dp-col::after{content:'';position:absolute;left:0;right:0;height:72px;z-index:2;pointer-events:none}
+.dp-col::before{top:0;background:linear-gradient(to bottom,#0F172A,transparent)}
+.dp-col::after{bottom:0;background:linear-gradient(to top,#0F172A,transparent)}
+.dp-scroll{height:100%;overflow-y:scroll;scroll-snap-type:y mandatory;scrollbar-width:none;padding:72px 0}
+.dp-scroll::-webkit-scrollbar{display:none}
+.dp-item{height:56px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:500;color:var(--t3);scroll-snap-align:center;cursor:pointer;transition:color .15s,font-size .15s}
+.dp-item.selected{color:var(--t1);font-size:20px;font-weight:700}
+.dp-selector{position:absolute;top:50%;left:0;right:0;height:56px;transform:translateY(-50%);border-top:1px solid rgba(6,182,212,.3);border-bottom:1px solid rgba(6,182,212,.3);border-radius:4px;pointer-events:none;z-index:1}
+.dp-label{font-size:10px;font-weight:600;color:var(--t3);text-align:center;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+
 /* CONFIRM DELETE MODAL */
 #confirm-modal{display:none;position:fixed;inset:0;z-index:300;align-items:center;justify-content:center;padding:24px}
 #confirm-modal.open{display:flex}
@@ -557,6 +683,38 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
 <!-- LOADING -->
 <div id="loading"><div class="spinner"></div><div><div class="lt">Analisando laudo com IA…</div><div class="ls" id="lfn"></div></div></div>
 <div id="error-msg"></div>
+
+<!-- CHRONIA TOAST/ALERT/CONFIRM -->
+<div id="ch-toast">
+  <div class="ct-backdrop" id="ct-backdrop"></div>
+  <div class="ct-box">
+    <div class="ct-icon" id="ct-icon"></div>
+    <div class="ct-title" id="ct-title"></div>
+    <div class="ct-msg" id="ct-msg"></div>
+    <div class="ct-actions" id="ct-actions"></div>
+  </div>
+</div>
+
+<!-- DATE PICKER MODAL -->
+<div id="date-picker-modal">
+  <div class="dp-backdrop" onclick="closeDatePicker()"></div>
+  <div class="dp-box">
+    <div class="dp-header">
+      <div class="dp-title">Data de nascimento</div>
+      <button class="dp-confirm" onclick="confirmDatePicker()">Confirmar</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:4px">
+      <div style="flex:1;text-align:center" class="dp-label">Dia</div>
+      <div style="flex:1;text-align:center" class="dp-label">Mês</div>
+      <div style="flex:1.4;text-align:center" class="dp-label">Ano</div>
+    </div>
+    <div class="dp-cols">
+      <div class="dp-col"><div class="dp-selector"></div><div class="dp-scroll" id="dp-day"></div></div>
+      <div class="dp-col"><div class="dp-selector"></div><div class="dp-scroll" id="dp-month"></div></div>
+      <div class="dp-col" style="flex:1.4"><div class="dp-selector"></div><div class="dp-scroll" id="dp-year"></div></div>
+    </div>
+  </div>
+</div>
 
 <!-- CONFIRM DELETE MODAL -->
 <div id="confirm-modal">
@@ -778,7 +936,10 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
         </div>
         <div>
           <label style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">Data de nascimento</label>
-          <input id="pf-birthdate" type="date" onchange="updateAgeDisplay()" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 12px;color:var(--t1);font-family:'Inter',sans-serif;font-size:14px;margin-top:6px;outline:none">
+          <div onclick="openDatePicker()" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 12px;color:var(--t1);font-family:'Inter',sans-serif;font-size:14px;margin-top:6px;cursor:pointer;min-height:42px;display:flex;align-items:center" id="pf-birthdate-display">
+            <span id="pf-birthdate-text" style="color:var(--t3)">Selecionar data</span>
+          </div>
+          <input id="pf-birthdate" type="hidden">
           <div id="pf-age-display" style="font-size:12px;color:var(--cyan);margin-top:5px;font-weight:600;min-height:18px"></div>
         </div>
         <div>
