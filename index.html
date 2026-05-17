@@ -2152,8 +2152,13 @@ REGRAS ABSOLUTAS — SIGA TODAS SEM EXCEÇÃO:
    - Coluna "Valores de Referência", "VR", "Referência", "Ref.", "Normal", "Faixa de referência"
    - Texto logo abaixo ou ao lado do resultado
    - Texto corrido como "Referência: Masculino 3,5 a 5,5" → use o intervalo do sexo do paciente
-   - Formatos aceitos: "3,5 - 5,5", "3.5 - 5.5", "3,5 a 5,5", "até 40", "< 40", "> 5", "acima de 5", "menor que 10", "10,0 – 40,0"
-   - Referências por sexo: se houver "Masculino: X - Y" e o paciente for masculino, use esse intervalo
+   - Formatos aceitos (TODOS devem ser reconhecidos):
+     * Intervalos: "3,5 - 5,5", "3.5 - 5.5", "3,5 a 5,5", "entre 3,5 e 5,5", "10,0 – 40,0"
+     * Limite superior: "até 40", "< 40", "menor que 40", "inferior a 40", "INFERIOR OU IGUAL A 40", "≤ 40", "no máximo 40", "abaixo de 40"
+     * Limite inferior: "> 5", "acima de 5", "maior que 5", "superior a 5", "SUPERIOR OU IGUAL A 5", "≥ 5", "no mínimo 5", "acima de 5"
+     * Conversão obrigatória: "INFERIOR OU IGUAL A 40" → refMin=null, refMax=40. "SUPERIOR OU IGUAL A 5" → refMin=5, refMax=null
+   - Referências por sexo: se houver "HOMENS: X" e "MULHERES: Y", use o valor do sexo do paciente informado no perfil
+   - Se não souber o sexo, use o intervalo mais abrangente
    - Referências por faixa etária: use a faixa que corresponde à idade do paciente
    - Conversão: "até 40" → refMin=null, refMax=40. "> 5" → refMin=5, refMax=null. "3,5 a 5,5" → refMin=3.5, refMax=5.5
    - Vírgula decimal brasileira: "1,38" = 1.38. "3,5" = 3.5
