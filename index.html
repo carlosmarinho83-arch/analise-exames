@@ -244,6 +244,7 @@ function openAgenda(){
 function closeAgenda(){
   const medOpen=document.getElementById('med-form').classList.contains('open');
   const cycleOpen=document.getElementById('cycle-form').classList.contains('open');
+  // Form aberto com dados → confirmar descarte
   if(medOpen&&formHasData(['mf-name','mf-dose','mf-brand','mf-qty-num'])){
     chConfirm('Medicamento não salvo','Você começou a cadastrar um medicamento. Deseja descartar e fechar?',()=>{
       closeMedForm();document.getElementById('agenda-modal').classList.remove('open');
@@ -254,6 +255,9 @@ function closeAgenda(){
       closeCycleForm();document.getElementById('agenda-modal').classList.remove('open');
     });return;
   }
+  // Form aberto mas vazio → só fecha o form, não a agenda
+  if(medOpen){closeMedForm();return;}
+  if(cycleOpen){closeCycleForm();return;}
   document.getElementById('agenda-modal').classList.remove('open');
 }
 
@@ -272,6 +276,9 @@ function agTab(tab){
       closeCycleForm();doAgTab(tab);
     });return;
   }
+  // Form vazio → fecha silenciosamente e troca de aba
+  if(medOpen)closeMedForm();
+  if(cycleOpen)closeCycleForm();
   doAgTab(tab);
 }
 
@@ -495,11 +502,10 @@ function renderCycles(){
       const vale=c.peakvalley&&c.valeDays?new Date(d.getTime()+c.valeDays*86400000):c.peakvalley&&c.type==='interval'?new Date(d.getTime()+(c.interval-1)*86400000):null;
       return`<div class="cycle-row">
         <span class="cycle-label">${fmtDate(d)}</span>
-        <span class="cycle-val">${label}</span>
         <span class="cycle-badge cycle-dose">Aplicação</span>
       </div>
-      ${pico&&i===0?`<div class="cycle-row"><span class="cycle-label">${fmtDate(pico)} (+48h)</span><span class="cycle-val">Pico</span><span class="cycle-badge cycle-pico">Pico</span></div>`:''}
-      ${vale&&i===0?`<div class="cycle-row"><span class="cycle-label">${fmtDate(vale)}</span><span class="cycle-val">Vale / Próx.</span><span class="cycle-badge cycle-vale">Vale</span></div>`:''}`;
+      ${pico&&i===0?`<div class="cycle-row"><span class="cycle-label">${fmtDate(pico)}</span><span class="cycle-badge cycle-pico">Pico</span></div>`:''}
+      ${vale&&i===0?`<div class="cycle-row"><span class="cycle-label">${fmtDate(vale)}</span><span class="cycle-badge cycle-vale">Vale</span></div>`:''}`;
     }).join('');
     const freqTxt=c.type==='interval'?`A cada ${c.interval} dias`:c.days.map(d=>DAYS_PT[d]).join(', ');
     return`<div class="ag-item">
@@ -880,10 +886,10 @@ body{font-family:'Inter',sans-serif;color:var(--t1);max-width:430px;margin:0 aut
 .ag-toggle input:checked+.ag-toggle-slider{background:linear-gradient(135deg,#2563EB,#06B6D4)}
 .ag-toggle input:checked+.ag-toggle-slider::before{transform:translateX(20px)}
 .cycle-next{background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.15);border-radius:10px;padding:10px 12px;margin-top:8px}
-.cycle-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:3px 0}
-.cycle-label{color:var(--t3)}
-.cycle-val{color:var(--t1);font-weight:600}
-.cycle-badge{font-size:10px;font-weight:700;border-radius:6px;padding:2px 7px}
+.cycle-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.cycle-row:last-child{border-bottom:none}
+.cycle-label{color:var(--t1);font-weight:500;flex:1}
+.cycle-badge{font-size:10px;font-weight:700;border-radius:6px;padding:3px 9px;flex-shrink:0}
 .cycle-pico{background:rgba(239,68,68,.15);color:#EF4444}
 .cycle-vale{background:rgba(245,158,11,.15);color:#F59E0B}
 .cycle-dose{background:rgba(16,185,129,.15);color:#10B981}
@@ -1090,7 +1096,7 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
 .re-btn-save{flex:2;background:linear-gradient(135deg,#2563EB,#06B6D4);border:none;border-radius:12px;padding:12px;font-family:'Inter',sans-serif;font-size:14px;font-weight:700;color:#fff;cursor:pointer}
 
 /* DATE PICKER MODAL */
-#date-picker-modal{display:none;position:fixed;inset:0;z-index:400;align-items:flex-end;justify-content:center}
+#date-picker-modal{display:none;position:fixed;inset:0;z-index:600;align-items:flex-end;justify-content:center}
 #date-picker-modal.open{display:flex}
 .dp-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px)}
 .dp-box{position:relative;background:#0F172A;border-radius:24px 24px 0 0;padding:20px 20px 32px;width:100%;max-width:430px;z-index:1;animation:dpIn .25s ease}
@@ -1424,11 +1430,11 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
           <div id="cf-pv-config" style="display:block">
             <div style="display:flex;gap:10px">
               <div class="ag-field" style="flex:1">
-                <div class="ag-label">Pico (dias após aplicação)</div>
+                <div style="font-size:11px;font-weight:600;color:var(--t3);letter-spacing:.3px;margin-bottom:5px">Pico — dias após aplicação</div>
                 <input class="ag-input" id="cf-peak-days" type="number" min="1" max="30" placeholder="Ex: 2" value="2">
               </div>
               <div class="ag-field" style="flex:1">
-                <div class="ag-label">Vale (dias após aplicação)</div>
+                <div style="font-size:11px;font-weight:600;color:var(--t3);letter-spacing:.3px;margin-bottom:5px">Vale — dias após aplicação</div>
                 <input class="ag-input" id="cf-vale-days" type="number" min="1" max="90" placeholder="Ex: 4">
               </div>
             </div>
