@@ -25,6 +25,7 @@ const auth = firebase.auth();
 
 let currentUID = null;
 let currentUserName = 'Usuário';
+let currentProfile = {name:'', sex:'', age:'', weight:''};
 
 // ── FIREBASE DATA ──────────────────────────────────────────────────────────
 function userRef() { return `users/${currentUID}/exames`; }
@@ -45,8 +46,14 @@ auth.onAuthStateChanged(async user => {
     currentUID = user.uid;
     // Get display name from database
     try {
-      const snap = await db.ref(`users/${user.uid}/profile/name`).get();
-      currentUserName = snap.exists() ? snap.val() : user.email.split('@')[0];
+      const snap = await db.ref(`users/${user.uid}/profile`).get();
+      if(snap.exists()){
+        const p=snap.val();
+        currentUserName = p.name || user.email.split('@')[0];
+        currentProfile = {name:p.name||'',sex:p.sex||'',age:p.age||'',weight:p.weight||''};
+      } else {
+        currentUserName = user.email.split('@')[0];
+      }
     } catch(e) { currentUserName = user.email.split('@')[0]; }
     showApp();
     window.fbLoad();
@@ -96,6 +103,32 @@ window.doRegister = async () => {
                       e.code==='auth/invalid-email'?'E-mail inválido.':'Erro ao criar conta.';
   }
 };
+
+window.saveProfile = async () => {
+  const name = document.getElementById('pf-name').value.trim();
+  const sex  = document.getElementById('pf-sex').value;
+  const age  = document.getElementById('pf-age').value;
+  const weight = document.getElementById('pf-weight').value;
+  if(!name){alert('Digite seu nome completo.');return;}
+  try{
+    await db.ref(`users/${currentUID}/profile`).set({name,sex,age:age?Number(age):null,weight:weight?Number(weight):null,email:firebase.auth().currentUser.email});
+    currentProfile={name,sex,age:age?Number(age):'',weight:weight?Number(weight):''};
+    currentUserName=name;
+    const first=name.split(' ')[0];
+    const greetEl=document.getElementById('greet-name');if(greetEl)greetEl.textContent=`Olá, ${first} 👋`;
+    const avatarEl=document.getElementById('avatar-el');if(avatarEl)avatarEl.textContent=first.charAt(0).toUpperCase();
+    const perfilName=document.getElementById('perfil-name');if(perfilName)perfilName.textContent=name;
+    const perfilAvatar=document.getElementById('perfil-avatar');if(perfilAvatar)perfilAvatar.textContent=first.charAt(0).toUpperCase();
+    alert('Perfil salvo!');
+  }catch(e){alert('Erro ao salvar: '+e.message);}
+};
+
+function populateProfileForm(){
+  const n=document.getElementById('pf-name');if(n)n.value=currentProfile.name||'';
+  const s=document.getElementById('pf-sex');if(s)s.value=currentProfile.sex||'';
+  const a=document.getElementById('pf-age');if(a)a.value=currentProfile.age||'';
+  const w=document.getElementById('pf-weight');if(w)w.value=currentProfile.weight||'';
+}
 
 window.doLogout = async () => {
   if(confirm('Deseja sair da sua conta?')) {
@@ -610,10 +643,38 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
       </div>
       <div id="featured-list"></div>
     </div>
-    <div style="background:var(--card);border-radius:18px;padding:24px;border:1px solid rgba(255,255,255,.04);text-align:center;margin:12px 16px 0">
-      <div style="font-size:36px;margin-bottom:10px">🚧</div>
-      <div style="font-size:18px;font-weight:700;margin-bottom:6px">Em breve</div>
-      <div style="font-size:14px;color:var(--t2)">Mais configurações chegando em breve</div>
+    <div style="background:var(--card);border-radius:18px;padding:20px;border:1px solid rgba(255,255,255,.04);margin:12px 16px 0">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div>
+          <div style="font-size:16px;font-weight:700">Dados pessoais</div>
+          <div style="font-size:12px;color:var(--t2);margin-top:3px">Usados para personalizar a análise</div>
+        </div>
+        <button onclick="saveProfile()" style="background:linear-gradient(135deg,#2563EB,#06B6D4);border:none;color:#fff;border-radius:8px;padding:8px 16px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer">Salvar</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div>
+          <label style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">Nome completo</label>
+          <input id="pf-name" type="text" placeholder="Seu nome completo" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 12px;color:var(--t1);font-family:'Inter',sans-serif;font-size:14px;margin-top:6px;outline:none">
+        </div>
+        <div style="display:flex;gap:10px">
+          <div style="flex:1">
+            <label style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">Sexo</label>
+            <select id="pf-sex" style="width:100%;background:#1E293B;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 12px;color:var(--t1);font-family:'Inter',sans-serif;font-size:14px;margin-top:6px;outline:none">
+              <option value="">—</option>
+              <option value="masculino">Masculino</option>
+              <option value="feminino">Feminino</option>
+            </select>
+          </div>
+          <div style="flex:1">
+            <label style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">Idade</label>
+            <input id="pf-age" type="number" placeholder="Anos" min="1" max="120" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 12px;color:var(--t1);font-family:'Inter',sans-serif;font-size:14px;margin-top:6px;outline:none">
+          </div>
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">Peso (kg)</label>
+          <input id="pf-weight" type="number" placeholder="Ex: 75" min="1" max="300" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 12px;color:var(--t1);font-family:'Inter',sans-serif;font-size:14px;margin-top:6px;outline:none">
+        </div>
+      </div>
     </div>
   </div>
 
@@ -747,10 +808,29 @@ async function claude(b64,fn){
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:8000,
-      system:'Você é especialista em laudos médicos. Retorne APENAS JSON válido sem markdown, sem texto extra: {"date":"YYYY-MM-DD ou null","lab":"laboratório","patient":"nome ou null","results":[{"name":"exame","value":numero,"unit":"unidade","refMin":numero_ou_null,"refMax":numero_ou_null,"status":"normal|alto|baixo|indeterminado"}]}. Inclua TODOS os exames do laudo.',
+      system:`Você é um extrator especializado em laudos médicos laboratoriais. Sua única função é extrair dados e retornar JSON válido.
+
+REGRAS OBRIGATÓRIAS:
+1. Retorne APENAS JSON puro — sem markdown, sem texto, sem explicações.
+2. Extraia TODOS os exames presentes no laudo, sem exceção.
+3. Para refMin e refMax: procure no laudo por "Valor de Referência", "VR", "Referência", "Ref.", "Valores de referência", intervalos como "10 - 20", "até 40", "maior que 5". Se encontrar, converta para número. Se não encontrar, use null.
+4. Para status: compare o value com refMin/refMax. Se value > refMax use "alto". Se value < refMin use "baixo". Se dentro do intervalo use "normal". Se sem referência use "indeterminado".
+5. Para value: use sempre número (float ou int), nunca string.
+6. Formato obrigatório: {"date":"YYYY-MM-DD ou null","lab":"nome do laboratório ou null","patient":"nome do paciente ou null","results":[{"name":"nome do exame","value":numero,"unit":"unidade de medida","refMin":numero_ou_null,"refMax":numero_ou_null,"status":"normal|alto|baixo|indeterminado"}]}`,
       messages:[{role:'user',content:[
         {type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},
-        {type:'text',text:'Analise este laudo ('+fn+') e retorne JSON.'}
+        {type:'text',text:(()=>{
+          const p=currentProfile;
+          let ctx='';
+          if(p.sex||p.age||p.weight){
+            ctx=' Dados do paciente para contextualizar as referências:';
+            if(p.sex)ctx+=' Sexo: '+p.sex+'.';
+            if(p.age)ctx+=' Idade: '+p.age+' anos.';
+            if(p.weight)ctx+=' Peso: '+p.weight+'kg.';
+            ctx+=' Use esses dados para validar se os valores de referência do laudo são adequados para este perfil.';
+          }
+          return 'Extraia todos os dados deste laudo ('+fn+'). Preste especial atenção aos valores de referência — eles costumam aparecer após o resultado na forma de intervalos (ex: 10,0 - 40,0) ou como VR/Referência. Retorne o JSON conforme instruído.'+ctx;
+        })()}
       ]}]
     })
   });
@@ -1030,7 +1110,7 @@ function sw(n){
   });
   document.getElementById('page').scrollTop=0;
   if(n==='graficos')rCharts();
-  if(n==='perfil')rFeaturedList();
+  if(n==='perfil'){rFeaturedList();populateProfileForm();}
 }
 
 // Auth handles initialization via onAuthStateChanged
