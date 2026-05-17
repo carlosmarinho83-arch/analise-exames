@@ -1662,30 +1662,47 @@ function rFeaturedList() {
   if(!container) return;
   const allExams = getAvailableExams();
 
-  // Ensure featuredList has no more slots than needed
-  // Show slots: all filled + 1 empty (if < 10)
+  if(!allExams.length){
+    container.innerHTML='<div style="font-size:13px;color:var(--t3);text-align:center;padding:16px 0">Importe laudos para selecionar exames.</div>';
+    return;
+  }
+
   const filled = featuredList.filter(f=>f&&f.search);
+  // Show all filled slots + 1 empty slot (if < 10)
   const slots = filled.length < 10 ? [...filled, {label:'',search:''}] : [...filled];
 
   container.innerHTML = slots.map((item, i) => {
-    // Already selected in other slots
-    const takenSearches = slots.map((s,j)=>j!==i&&s&&s.search?s.search.toLowerCase():null).filter(Boolean);
+    const isFilled = !!item.search;
+    const takenSearches = filled.map((s,j)=>j!==i&&s.search?s.search.toLowerCase():null).filter(Boolean);
     const options = allExams.filter(n => !takenSearches.includes(n.toLowerCase()));
-    return `
-    <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)">
-      <div style="width:24px;height:24px;border-radius:6px;background:rgba(37,99,235,.2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--cyan);flex-shrink:0">${i+1}</div>
-      <select onchange="onFeaturedChange(${i},this)"
-        style="flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:8px 10px;color:var(--t1);font-family:'Inter',sans-serif;font-size:13px;outline:none">
-        <option value="">— Selecione um exame —</option>
-        ${options.map(n=>`<option value="${n.toLowerCase()}" ${item.search&&item.search.toLowerCase()===n.toLowerCase()?'selected':''}>${n}</option>`).join('')}
-      </select>
-      ${item.search?`<button onclick="removeFeatured(${i})" style="background:rgba(239,68,68,.15);border:none;border-radius:8px;padding:8px;cursor:pointer;color:#EF4444;flex-shrink:0">✕</button>`:''}
-    </div>`;
-  }).join('');
 
-  if(!allExams.length){
-    container.innerHTML='<div style="font-size:13px;color:var(--t3);text-align:center;padding:16px 0">Importe laudos para selecionar exames.</div>';
-  }
+    if(isFilled){
+      // Filled slot: show as styled div with name + remove button
+      return `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+        <div style="width:24px;height:24px;border-radius:6px;background:rgba(37,99,235,.2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--cyan);flex-shrink:0">${i+1}</div>
+        <div style="flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:9px 12px;display:flex;align-items:center;justify-content:space-between;overflow:hidden">
+          <span style="font-size:13px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.label||item.search}</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2.5" stroke-linecap="round" style="flex-shrink:0;margin-left:6px"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <button onclick="removeFeatured(${i})" style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.2);border-radius:8px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#EF4444;font-size:13px;flex-shrink:0">✕</button>
+      </div>`;
+    } else {
+      // Empty slot: native select hidden behind custom wrapper
+      return `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0${i>0?';border-top:1px solid rgba(255,255,255,.05)':''}">
+        <div style="width:24px;height:24px;border-radius:6px;background:rgba(37,99,235,.1);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:rgba(6,182,212,.4);flex-shrink:0">${i+1}</div>
+        <div style="flex:1;position:relative">
+          <select onchange="onFeaturedChange(${i},this)"
+            style="width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:9px 34px 9px 12px;color:#64748B;font-family:'Inter',sans-serif;font-size:13px;outline:none;-webkit-appearance:none;appearance:none;cursor:pointer">
+            <option value="">— Selecione um exame —</option>
+            ${options.map(n=>`<option value="${n.toLowerCase()}">${n}</option>`).join('')}
+          </select>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2.5" stroke-linecap="round" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+      </div>`;
+    }
+  }).join('');
 }
 
 window.onFeaturedChange = (i, sel) => {
