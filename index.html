@@ -1855,20 +1855,20 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
 
   <!-- ── EXAMES ── -->
   <div id="screen-exames" class="screen">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 16px 0">
-      <div class="screen-title" style="padding:0">Meus exames</div>
-      <button onclick="openArchive()" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:7px 12px;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;color:var(--t2);cursor:pointer;display:flex;align-items:center;gap:6px">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-        Arquivo
-      </button>
-    </div>
+    <div class="screen-title">Meus exames</div>
     <div class="search-wrap">
       <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input id="s-exames" type="text" placeholder="Buscar exame…" oninput="rExames()">
     </div>
-    <div class="filter-tabs">
-      <button class="filter-tab active" onclick="setF('todos',this)">Todos</button>
-      <button class="filter-tab" onclick="setF('recentes',this)">Recentes</button>
+    <div class="filter-tabs" style="display:flex;align-items:center;justify-content:space-between">
+      <div style="display:flex;gap:8px">
+        <button class="filter-tab active" onclick="setF('todos',this)">Todos</button>
+        <button class="filter-tab" onclick="setF('recentes',this)">Recentes</button>
+      </div>
+      <button onclick="openArchive()" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:6px 12px;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;color:var(--t2);cursor:pointer;display:flex;align-items:center;gap:5px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+        Arquivo
+      </button>
     </div>
     <div class="drop-zone" id="drop-zone" onclick="openImport()">
       <div class="dz-icon-wrap">
