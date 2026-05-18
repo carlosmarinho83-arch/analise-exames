@@ -462,8 +462,13 @@ function openMedForm(med=null, afterId=null){
   setTimeout(()=>form.scrollIntoView({behavior:'smooth',block:'start'}),100);
 }
 function closeMedForm(){
-  document.getElementById('med-form').classList.remove('open');
-  document.getElementById('med-add-btn').style.display='flex';
+  const form=document.getElementById('med-form');
+  form.classList.remove('open');
+  // Move form back before add button (original position)
+  const addBtn=document.getElementById('med-add-btn');
+  const section=document.getElementById('ag-meds');
+  if(addBtn&&section)section.insertBefore(form,addBtn);
+  addBtn.style.display='flex';
 }
 function toggleMedDays(){
   const freq=document.getElementById('mf-freq').value;
