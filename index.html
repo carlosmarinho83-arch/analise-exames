@@ -1463,7 +1463,7 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
 <div id="loading"><div class="spinner"></div><div><div class="lt">Analisando laudo com IA…</div><div class="ls" id="lfn"></div></div></div>
 <div id="error-msg"></div>
 
-<button class="back-to-top" id="back-to-top" onclick="document.getElementById('page').scrollTo({top:0,behavior:'smooth'})">
+<button id="back-to-top" onclick="document.getElementById('page').scrollTo({top:0,behavior:'smooth'})" style="position:fixed;bottom:calc(var(--nav-h) + 12px);right:16px;width:38px;height:38px;border-radius:10px;background:#1E293B;border:1px solid rgba(255,255,255,.12);display:none;align-items:center;justify-content:center;cursor:pointer;z-index:90;color:#94A3B8">
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>
 </button>
 
@@ -2428,9 +2428,9 @@ document.getElementById('page').addEventListener('scroll',function(){
   const nav=curNav;
   if(btn){
     if(this.scrollTop>300&&(nav==='graficos'||nav==='insights')){
-      btn.classList.add('show');
+      btn.style.display='flex';
     } else {
-      btn.classList.remove('show');
+      btn.style.display='none';
     }
   }
 });
