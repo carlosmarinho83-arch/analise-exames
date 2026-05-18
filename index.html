@@ -2465,7 +2465,14 @@ function rCharts(){
 function rInsights(){
   const con=document.getElementById('insights-content');
   if(!window.exams.length){con.innerHTML='<div style="text-align:center;color:var(--t2);padding:40px 0;font-size:14px">Importe laudos para ver os insights.</div>';return;}
-  const all=window.exams.flatMap(e=>(e.results||[]).map(r=>({...r,date:e.date,lab:e.lab})));
+  // Pega apenas o resultado mais recente de cada exame
+  const allRaw=window.exams.flatMap(e=>(e.results||[]).map(r=>({...r,date:e.date,lab:e.lab})));
+  const latestMap={};
+  allRaw.forEach(r=>{
+    const key=r.name.toLowerCase();
+    if(!latestMap[key]||new Date(r.date)>new Date(latestMap[key].date))latestMap[key]=r;
+  });
+  const all=Object.values(latestMap);
   const sec=(title,items,color,dotColor)=>!items.length?'':`
     <div class="ins-section">
       <div class="ins-section-title"><div class="dot" style="background:${dotColor}"></div><span class="t" style="color:${color}">${title}</span></div>
