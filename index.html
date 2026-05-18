@@ -1463,6 +1463,10 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
 <div id="loading"><div class="spinner"></div><div><div class="lt">Analisando laudo com IA…</div><div class="ls" id="lfn"></div></div></div>
 <div id="error-msg"></div>
 
+<button class="back-to-top" id="back-to-top" onclick="document.getElementById('page').scrollTo({top:0,behavior:'smooth'})">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>
+</button>
+
 <!-- ARCHIVE MODAL -->
 <div id="archive-modal" style="display:none;position:fixed;inset:0;z-index:400;align-items:flex-end;justify-content:center">
   <div style="position:absolute;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(4px)" onclick="closeArchive()"></div>
@@ -1891,6 +1895,10 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
   <!-- ── GRAFICOS ── -->
   <div id="screen-graficos" class="screen">
     <div class="screen-title">Gráficos</div>
+    <div class="screen-search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" placeholder="Buscar exame…" oninput="filterCharts(this.value)" id="s-graficos">
+    </div>
     <div id="charts-list"></div>
     <div class="ai-card">
       <div class="ai-title"><span>✨</span><span class="t">Análise inteligente</span></div>
@@ -1901,6 +1909,10 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
   <!-- ── INSIGHTS ── -->
   <div id="screen-insights" class="screen">
     <div class="screen-title">Insights</div>
+    <div class="screen-search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" placeholder="Buscar exame…" oninput="filterInsights(this.value)" id="s-insights">
+    </div>
     <div id="insights-content"></div>
   </div>
 
@@ -2389,6 +2401,40 @@ function rExames(){
 list.appendChild(el);
   });
 }
+function filterCharts(q){
+  q=q.toLowerCase();
+  document.querySelectorAll('.chart-card').forEach(card=>{
+    const name=card.querySelector('.cc-name');
+    card.style.display=(!q||name&&name.textContent.toLowerCase().includes(q))?'':'none';
+  });
+}
+
+function filterInsights(q){
+  q=q.toLowerCase();
+  document.querySelectorAll('.ins-card').forEach(card=>{
+    const name=card.querySelector('.ins-name');
+    card.style.display=(!q||name&&name.textContent.toLowerCase().includes(q))?'':'none';
+  });
+  // Hide empty sections
+  document.querySelectorAll('.ins-section').forEach(sec=>{
+    const visible=[...sec.querySelectorAll('.ins-card')].some(c=>c.style.display!=='none');
+    sec.style.display=visible?'':'none';
+  });
+}
+
+// Back to top visibility
+document.getElementById('page').addEventListener('scroll',function(){
+  const btn=document.getElementById('back-to-top');
+  const nav=curNav;
+  if(btn){
+    if(this.scrollTop>300&&(nav==='graficos'||nav==='insights')){
+      btn.classList.add('show');
+    } else {
+      btn.classList.remove('show');
+    }
+  }
+});
+
 function setF(f,el){curFilter=f;document.querySelectorAll('.filter-tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');rExames();}
 
 /* CHARTS */
