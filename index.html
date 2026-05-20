@@ -707,7 +707,7 @@ function renderCycles(){
 function renderNotifs(){
   const el=document.getElementById('notifs-list');
   const all=[
-    ...agendaMeds.map(m=>({id:m.id,label:m.name,sub:m.time,type:'med'})),
+    ...agendaMeds.map(m=>({id:m.id,label:m.name,sub:m.schedules&&m.schedules.length?m.schedules.map(s=>s.time).join(', '):m.time||'',type:'med'})),
     ...agendaCycles.map(c=>({id:c.id,label:c.name,sub:c.type==='interval'?`A cada ${c.interval} dias`:c.days.map(d=>DAYS_PT[d]).join(', '),type:'cycle'}))
   ];
   if(!all.length){el.innerHTML='<div class="ag-empty">Adicione medicamentos ou aplicações para configurar notificações.</div>';return;}
