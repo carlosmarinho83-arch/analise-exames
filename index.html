@@ -1306,7 +1306,8 @@ td{font-size:13px;padding:9px 10px;border-top:1px solid rgba(255,255,255,.05);co
 .ct-icon{width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
 .ct-title{font-size:17px;font-weight:700;margin-bottom:8px;color:var(--t1)}
 .ct-msg{font-size:13px;color:var(--t2);line-height:1.6;margin-bottom:20px}
-.ct-actions{display:flex;gap:10px}
+.ct-actions{display:flex;gap:8px;flex-wrap:wrap}
+.ct-actions .ct-btn{flex:1;min-width:80px}
 .ct-btn{flex:1;border:none;border-radius:12px;padding:12px;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;cursor:pointer}
 .ct-btn-ok{background:linear-gradient(135deg,#2563EB,#06B6D4);color:#fff}
 .ct-btn-cancel{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1)!important;color:var(--t2)}
@@ -2106,6 +2107,51 @@ dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag');}
 dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
 dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');go(e.dataTransfer.files);});
 
+function showReimportChoice(file, hash, examId){
+  // Custom 3-option modal: Cancelar / Recuperar sem custo / Reimportar com IA
+  document.getElementById('ct-icon').style.cssText='background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.2)';
+  document.getElementById('ct-icon').innerHTML='<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+  document.getElementById('ct-title').textContent='Laudo encontrado no arquivo';
+  document.getElementById('ct-msg').textContent='Este PDF já foi importado antes mas foi excluído. Recuperar é sem custo. Reimportar reprocessa com a IA (gera custo).';
+  document.getElementById('ct-actions').innerHTML=`
+    <button class="ct-btn ct-btn-cancel" onclick="closeChToast(false)">Cancelar</button>
+    <button class="ct-btn" style="background:rgba(255,255,255,.1);color:var(--t1)" onclick="closeChToast(false);recoverArchivedExam('${examId}')">Recuperar</button>
+    <button class="ct-btn ct-btn-ok" onclick="closeChToast(false);reimportWithAI(window._pendingReimportFile)">Reimportar</button>
+  `;
+  document.getElementById('ch-toast').classList.add('open');
+  window._pendingReimportFile = file;
+  window._pendingReimportHash = hash;
+}
+
+async function recoverArchivedExam(examId){
+  const archive = await window.fbLoadArchive();
+  const archived = archive.find(e=>String(e.id)===String(examId));
+  if(archived){
+    window.exams.push(archived);
+    await db.ref(userRef()+'/'+archived.id).set(archived);
+    render();
+    chAlert('success','Laudo recuperado!','O laudo foi restaurado sem nenhum custo.');
+  } else {
+    chAlert('error','Não encontrado','O laudo não foi encontrado no arquivo.');
+  }
+}
+
+async function reimportWithAI(file){
+  if(!file)return;
+  load(true,file.name);
+  try{
+    const hash = window._pendingReimportHash || await hashFile(file);
+    const b64=await toB64(file);
+    const r=await claude(b64,file.name);
+    const newExam={id:Date.now()+'_'+Math.floor(Math.random()*10000),fn:file.name,hash,...r};
+    window.exams.push(newExam);
+    if(window.fbSave)await window.fbSave(newExam);
+    await window.fbSaveHash(hash, newExam.id);
+    load(false);render();
+    chAlert('success','Laudo reimportado!','Os dados foram extraídos novamente com a IA.');
+  }catch(e){load(false);showErr('Erro ao reimportar: '+e.message);}
+}
+
 async function go(files){
   const pdfs=[...files].filter(f=>f.type==='application/pdf');
   if(!pdfs.length){showErr('Envie apenas arquivos PDF.');return;}
@@ -2123,23 +2169,8 @@ async function go(files){
         if(inCurrent){
           chAlert('info','Laudo já importado','Este PDF já foi importado anteriormente. Nenhum crédito foi consumido.');
         } else {
-          // Offer to recover from archive
-          chConfirm(
-            'Laudo encontrado no arquivo',
-            'Este PDF já foi importado antes mas foi excluído. Deseja recuperá-lo sem custo?',
-            async ()=>{
-              const archive = await window.fbLoadArchive();
-              const archived = archive.find(e=>String(e.id)===String(existing.examId));
-              if(archived){
-                window.exams.push(archived);
-                await db.ref(userRef()+'/'+archived.id).set(archived);
-                render();
-                chAlert('success','Laudo recuperado!','O laudo foi restaurado sem nenhum custo.');
-              } else {
-                chAlert('error','Não encontrado','O laudo não foi encontrado no arquivo.');
-              }
-            }
-          );
+          // Offer to recover from archive OR reimport with fresh AI extraction
+          showReimportChoice(f, hash, existing.examId);
         }
         document.getElementById('fi').value='';
         continue;
