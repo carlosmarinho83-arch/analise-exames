@@ -2179,6 +2179,14 @@ REGRAS ABSOLUTAS — SIGA TODAS SEM EXCEÇÃO:
 
 2. EXTRAIA TODOS OS EXAMES SEM EXCEÇÃO: Cada linha, item ou seção com nome e valor numérico é um exame. Inclua hemograma completo (cada série separadamente), urina, fezes, hormônios, vitaminas, lipídios, enzimas, eletrólitos — absolutamente tudo.
 
+2B. ATENÇÃO CRÍTICA — GRÁFICOS HISTÓRICOS IMPRESSOS NO PDF:
+   Muitos laudos brasileiros (especialmente laboratórios que acompanham pacientes ao longo do tempo) imprimem um MINI-GRÁFICO no rodapé de cada exame, mostrando vários resultados anteriores com suas respectivas datas (ex: um gráfico de linha com pontos rotulados "512", "615", "1.921", "1.103" e datas como "15/08/25", "09/02/26", "27/02/26", "24/06/26").
+   - Esses números do gráfico histórico são SOMENTE PARA CONTEXTO VISUAL — eles representam resultados de OUTRAS coletas, em OUTRAS datas, que já foram processados em IMPORTAÇÕES ANTERIORES deste mesmo laudo.
+   - VOCÊ DEVE EXTRAIR APENAS O VALOR QUE APARECE NO CAMPO "RESULTADO:" (ou "RESULTADO" em destaque/negrito) referente à data de coleta deste documento específico.
+   - NUNCA crie múltiplos resultados para o mesmo exame a partir dos pontos do gráfico histórico. Cada exame deve aparecer APENAS UMA VEZ no JSON de saída, com o valor do campo "RESULTADO" e a data principal informada em "Data/Hora Coleta" ou "Data da coleta" no topo/cabeçalho daquele exame específico.
+   - Ignore completamente números soltos próximos a eixos de gráfico (linhas como "0  500  1.000  1.500  2.000  2.500" e sequências de números com datas formatadas como DD/MM/AA abaixo) — eles não são resultados a extrair, são apenas a ilustração do histórico.
+   - O "date" do JSON deve ser a data de coleta principal do laudo (a mais recente, geralmente no cabeçalho ou logo abaixo do nome de cada exame), não as datas dos pontos do gráfico histórico.
+
 3. VALORES DE REFERÊNCIA — ESTA É A REGRA MAIS IMPORTANTE:
    VOCÊ DEVE extrair o valor de referência de CADA exame. Procure em:
    - Coluna "Valores de Referência", "VR", "Referência", "Ref.", "Normal", "Faixa de referência"
@@ -2210,9 +2218,9 @@ REGRAS ABSOLUTAS — SIGA TODAS SEM EXCEÇÃO:
    - refMin ≤ value ≤ refMax → "normal"
    - refMin e refMax ambos null → "indeterminado"
 
-5. VALUE: Sempre número JavaScript (float ou int). NUNCA string. Converta vírgula para ponto decimal.
+5. VALUE: Sempre número JavaScript (float ou int). NUNCA string. Converta vírgula para ponto decimal. Use SEMPRE o valor do campo "RESULTADO" do exame, nunca um valor lido de dentro de um gráfico histórico.
 
-6. NOMES DOS EXAMES: Use o nome completo exatamente como aparece no laudo. Não abrevie.
+6. NOMES DOS EXAMES: Use o nome completo exatamente como aparece no laudo, em UM ÚNICO formato de capitalização consistente (prefira o nome como aparece no título da seção, ex: "TESTOSTERONA TOTAL"). Não abrevie. Não crie variações de espaçamento ou pontuação para o mesmo exame.
 
 7. FORMATO DE SAÍDA OBRIGATÓRIO — não desvie nem um caractere:
 {"date":"YYYY-MM-DD ou null","lab":"nome do laboratório ou null","patient":"nome do paciente ou null","results":[{"name":"nome completo do exame","value":numero,"unit":"unidade de medida","refMin":numero_ou_null,"refMax":numero_ou_null,"status":"normal|alto|baixo|indeterminado"}]}`,
