@@ -2443,12 +2443,19 @@ document.getElementById('page').addEventListener('scroll',function(){
 function setF(f,el){curFilter=f;document.querySelectorAll('.filter-tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');rExames();}
 
 /* CHARTS */
+function normName(s){
+  return (s||'').normalize('NFKC').replace(/\s+/g,' ').trim();
+}
+
 function buildMap(){
   const map={};
   window.exams.forEach(e=>(e.results||[]).forEach(r=>{
     const n=parseFloat(r.value);if(isNaN(n))return;
-    if(!map[r.name])map[r.name]={unit:r.unit,refMin:r.refMin,refMax:r.refMax,data:[]};
-    map[r.name].data.push({date:e.date,value:n,status:r.status});
+    const key=normName(r.name);
+    if(!map[key])map[key]={displayName:r.name.trim(),unit:r.unit,refMin:r.refMin,refMax:r.refMax,data:[]};
+    map[key].data.push({date:e.date,value:n,status:r.status});
+    if(map[key].refMin==null&&r.refMin!=null)map[key].refMin=r.refMin;
+    if(map[key].refMax==null&&r.refMax!=null)map[key].refMax=r.refMax;
   }));
   return map;
 }
@@ -2459,8 +2466,9 @@ function rCharts(){
   const map=buildMap();
   const names=Object.keys(map);
   if(!names.length){con.innerHTML='<div style="text-align:center;color:var(--t2);padding:40px 0;font-size:14px">Importe laudos para ver os gráficos.</div>';return;}
-  names.forEach((name,ni)=>{
-    const{unit,refMin,refMax,data}=map[name];
+  names.forEach((key,ni)=>{
+    const{displayName,unit,refMin,refMax,data}=map[key];
+    const name=displayName||key;
     const sorted=[...data].sort((a,b)=>new Date(a.date)-new Date(b.date));
     const lat=sorted[sorted.length-1],prev=sorted[sorted.length-2];
     const col=eColor(name,ni);
@@ -2468,7 +2476,7 @@ function rCharts(){
     const tC=prev?(lat.value>prev.value?'var(--warn)':lat.value<prev.value?'var(--red)':'var(--green)'):'var(--t2)';
     const si=statusInfo(lat.status);
     const card=document.createElement('div');card.className='chart-card';
-    const uid='ch_'+name.replace(/\W/g,'_');
+    const uid='ch_'+key.replace(/\W/g,'_');
     card.innerHTML=`
       <div class="cc-top">
         <div><div class="cc-name">${name}</div><div class="cc-unit">${unit||''}</div></div>
@@ -2482,7 +2490,7 @@ function rCharts(){
       </div>`;
     con.appendChild(card);
     const ctx=document.getElementById(uid).getContext('2d');
-    chartInst[name]=new Chart(ctx,{
+    chartInst[key]=new Chart(ctx,{
       type:'line',
       data:{labels:sorted.map(d=>fdShort(d.date)),datasets:[{
         data:sorted.map(d=>d.value),borderColor:col,
