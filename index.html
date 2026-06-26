@@ -2483,7 +2483,7 @@ function setF(f,el){curFilter=f;document.querySelectorAll('.filter-tab').forEach
 
 /* CHARTS */
 function normName(s){
-  return (s||'').normalize('NFKC').replace(/\s+/g,' ').trim();
+  return (s||'').normalize('NFKC').replace(/\s+/g,' ').trim().toLowerCase();
 }
 
 function buildMap(){
@@ -2491,7 +2491,15 @@ function buildMap(){
   window.exams.forEach(e=>(e.results||[]).forEach(r=>{
     const n=parseFloat(r.value);if(isNaN(n))return;
     const key=normName(r.name);
-    if(!map[key])map[key]={displayName:r.name.trim(),unit:r.unit,refMin:r.refMin,refMax:r.refMax,data:[]};
+    const cleanName=(r.name||'').normalize('NFKC').replace(/\s+/g,' ').trim();
+    if(!map[key]){
+      map[key]={displayName:cleanName,unit:r.unit,refMin:r.refMin,refMax:r.refMax,data:[]};
+    } else {
+      // Prefer a "Title Case"-looking name over ALL CAPS for nicer display
+      const isAllCaps = map[key].displayName === map[key].displayName.toUpperCase() && /[A-Z]/.test(map[key].displayName);
+      const candidateIsAllCaps = cleanName === cleanName.toUpperCase() && /[A-Z]/.test(cleanName);
+      if(isAllCaps && !candidateIsAllCaps) map[key].displayName = cleanName;
+    }
     map[key].data.push({date:e.date,value:n,status:r.status});
     if(map[key].refMin==null&&r.refMin!=null)map[key].refMin=r.refMin;
     if(map[key].refMax==null&&r.refMax!=null)map[key].refMax=r.refMax;
@@ -2708,8 +2716,20 @@ window.saveFeatured = async () => {
 };
 
 function getAvailableExams() {
-  // All unique exam names extracted from imported PDFs
-  return [...new Set(window.exams.flatMap(e=>(e.results||[]).map(r=>r.name)))].sort();
+  // All unique exam names extracted from imported PDFs (case-insensitive dedup)
+  const seen = {};
+  window.exams.forEach(e=>(e.results||[]).forEach(r=>{
+    const key = (r.name||'').trim().toLowerCase();
+    if(!key) return;
+    const clean = (r.name||'').trim();
+    if(!seen[key]) seen[key] = clean;
+    else {
+      const isAllCaps = seen[key] === seen[key].toUpperCase() && /[A-Z]/.test(seen[key]);
+      const candidateIsAllCaps = clean === clean.toUpperCase() && /[A-Z]/.test(clean);
+      if(isAllCaps && !candidateIsAllCaps) seen[key] = clean;
+    }
+  }));
+  return Object.values(seen).sort();
 }
 
 function rFeaturedList() {
