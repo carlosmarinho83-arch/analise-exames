@@ -2491,11 +2491,17 @@ function setF(f,el){curFilter=f;document.querySelectorAll('.filter-tab').forEach
 
 /* CHARTS */
 function normName(s){
-  return (s||'').normalize('NFKC').replace(/\s+/g,' ').trim().toLowerCase();
+  return (s||'')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'') // remove acentos
+    .replace(/\s+/g,' ').trim().toLowerCase();
 }
 
 function buildMap(){
   const map={};
+  function countAccents(s){
+    const stripped = s.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    return s.length - stripped.length + (s.normalize('NFD').length - s.length);
+  }
   window.exams.forEach(e=>(e.results||[]).forEach(r=>{
     const n=parseFloat(r.value);if(isNaN(n))return;
     const key=normName(r.name);
@@ -2503,10 +2509,17 @@ function buildMap(){
     if(!map[key]){
       map[key]={displayName:cleanName,unit:r.unit,refMin:r.refMin,refMax:r.refMax,data:[]};
     } else {
-      // Prefer a "Title Case"-looking name over ALL CAPS for nicer display
-      const isAllCaps = map[key].displayName === map[key].displayName.toUpperCase() && /[A-Z]/.test(map[key].displayName);
+      const current = map[key].displayName;
+      const isAllCaps = current === current.toUpperCase() && /[A-Z]/.test(current);
       const candidateIsAllCaps = cleanName === cleanName.toUpperCase() && /[A-Z]/.test(cleanName);
-      if(isAllCaps && !candidateIsAllCaps) map[key].displayName = cleanName;
+      // Prefer non-ALLCAPS over ALLCAPS
+      if(isAllCaps && !candidateIsAllCaps){
+        map[key].displayName = cleanName;
+      }
+      // Among non-ALLCAPS candidates, prefer the one with more accented characters
+      else if(!isAllCaps && !candidateIsAllCaps && countAccents(cleanName) > countAccents(current)){
+        map[key].displayName = cleanName;
+      }
     }
     map[key].data.push({date:e.date,value:n,status:r.status});
     if(map[key].refMin==null&&r.refMin!=null)map[key].refMin=r.refMin;
@@ -2583,7 +2596,7 @@ function rInsights(){
   const allRaw=window.exams.flatMap(e=>(e.results||[]).map(r=>({...r,date:e.date,lab:e.lab})));
   const latestMap={};
   allRaw.forEach(r=>{
-    const key=r.name.toLowerCase();
+    const key=normName(r.name);
     if(!latestMap[key]||new Date(r.date)>new Date(latestMap[key].date))latestMap[key]=r;
   });
   const all=Object.values(latestMap);
@@ -2724,10 +2737,10 @@ window.saveFeatured = async () => {
 };
 
 function getAvailableExams() {
-  // All unique exam names extracted from imported PDFs (case-insensitive dedup)
+  // All unique exam names extracted from imported PDFs (case + accent-insensitive dedup)
   const seen = {};
   window.exams.forEach(e=>(e.results||[]).forEach(r=>{
-    const key = (r.name||'').trim().toLowerCase();
+    const key = normName(r.name);
     if(!key) return;
     const clean = (r.name||'').trim();
     if(!seen[key]) seen[key] = clean;
